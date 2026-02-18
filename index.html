@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DuckDB Oat - CSV.GZ Fixed</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+        
+        :root {
+            --oat-cream: #FDFBF7;
+            --oat-warm: #F5F1EB;
+            --oat-beige: #E8E2D9;
+            --oat-taupe: #D4CFC7;
+            --oat-stone: #A8A39A;
+            --oat-charcoal: #5C5852;
+            --oat-espresso: #3D3A36;
+            --oat-accent: #B8956A;
+            --oat-accent-hover: #9A7B56;
+            --oat-success: #7A9E7E;
+            --oat-error: #C17B7B;
+        }
+        
+        [data-theme="dark"] {
+            --oat-cream: #1C1917;
+            --oat-warm: #292524;
+            --oat-beige: #44403C;
+            --oat-taupe: #57534E;
+            --oat-stone: #A8A29E;
+            --oat-charcoal: #D6D3D1;
+            --oat-espresso: #FAFAF9;
+            --oat-accent: #D4A373;
+            --oat-accent-hover: #E4B48A;
+            --oat-success: #86EFAC;
+            --oat-error: #FCA5A5;
+        }
+        
+        * { transition: background-color 0.2s, border-color 0.2s, color 0.2s; }
+        
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: var(--oat-cream);
+            color: var(--oat-espresso);
+        }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--oat-taupe); border-radius: 3px; }
+        
+        .btn-oat {
+            background: var(--oat-warm);
+            border: 1px solid var(--oat-beige);
+            color: var(--oat-charcoal);
+        }
+        .btn-oat:hover {
+            background: var(--oat-beige);
+            border-color: var(--oat-taupe);
+            color: var(--oat-espresso);
+        }
+        
+        .btn-primary {
+            background: var(--oat-espresso);
+            color: var(--oat-cream);
+            border: 1px solid var(--oat-espresso);
+        }
+        .btn-primary:hover {
+            background: var(--oat-charcoal);
+            border-color: var(--oat-charcoal);
+        }
+        
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .toast {
+            background: var(--oat-cream);
+            border: 1px solid var(--oat-beige);
+            border-left: 3px solid var(--oat-accent);
+            padding: 12px 16px;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 280px;
+            transform: translateX(400px);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .toast.show { transform: translateX(0); }
+        .toast.success { border-left-color: var(--oat-success); }
+        .toast.error { border-left-color: var(--oat-error); }
+        
+        .suggestions {
+            position: absolute;
+            background: var(--oat-cream);
+            border: 1px solid var(--oat-beige);
+            border-radius: 6px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            max-height: 280px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            min-width: 240px;
+        }
+        
+        .suggestion-header {
+            padding: 6px 12px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--oat-stone);
+            background: var(--oat-warm);
+            border-bottom: 1px solid var(--oat-beige);
+        }
+        
+        .suggestion-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid var(--oat-beige);
+        }
+        .suggestion-item:last-child { border-bottom: none; }
+        .suggestion-item:hover, .suggestion-item.selected {
+            background: var(--oat-warm);
+        }
+        
+        .suggestion-icon {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            font-size: 10px;
+        }
+        .icon-keyword { background: var(--oat-beige); color: var(--oat-accent); }
+        .icon-table { background: #DBEAFE; color: #1E40AF; }
+        .icon-function { background: #D1FAE5; color: #065F46; }
+        .icon-column { background: #FCE7F3; color: #9D174D; }
+        .icon-file { background: #FEF3C7; color: #92400E; }
+        
+        .drop-zone {
+            border: 2px dashed var(--oat-taupe);
+            border-radius: 8px;
+            transition: all 0.2s;
+            background: var(--oat-warm);
+        }
+        .drop-zone:hover, .drop-zone.drag-over {
+            border-color: var(--oat-accent);
+            background: var(--oat-beige);
+        }
+        
+        .data-table th {
+            font-weight: 500;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--oat-stone);
+            background: var(--oat-warm);
+        }
+        .data-table td {
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--oat-charcoal);
+        }
+        
+        .help-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(28, 25, 23, 0.6);
+            z-index: 10000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            backdrop-filter: blur(4px);
+        }
+        .help-modal.show { display: flex; }
+        
+        .help-content {
+            background: var(--oat-cream);
+            border-radius: 12px;
+            max-width: 700px;
+            width: 100%;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+            border: 1px solid var(--oat-beige);
+        }
+        
+        .code-block {
+            background: var(--oat-warm);
+            border: 1px solid var(--oat-beige);
+            border-radius: 6px;
+            padding: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            overflow-x: auto;
+            color: var(--oat-charcoal);
+            margin: 8px 0;
+        }
+        
+        .tag {
+            display: inline-block;
+            padding: 2px 8px;
+            background: var(--oat-warm);
+            border: 1px solid var(--oat-beige);
+            border-radius: 4px;
+            font-size: 10px;
+            color: var(--oat-charcoal);
+            margin-right: 6px;
+            margin-bottom: 6px;
+        }
+        
+        .theme-toggle {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            background: var(--oat-warm);
+            border: 1px solid var(--oat-beige);
+            color: var(--oat-charcoal);
+        }
+        .theme-toggle:hover {
+            background: var(--oat-beige);
+            color: var(--oat-espresso);
+        }
+        
+        .loader {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--oat-beige);
+            border-top-color: var(--oat-accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .compression-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 6px;
+            background: #FEF3C7;
+            color: #92400E;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+    <!-- Loading -->
+    <div id="loadingOverlay" class="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3" style="background: var(--oat-cream);">
+        <div class="loader" style="width: 24px; height: 24px;"></div>
+        <p class="text-sm" style="color: var(--oat-stone);">Initializing DuckDB...</p>
+    </div>
+
+    <!-- Toasts -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Help Modal -->
+    <div id="helpModal" class="help-modal" onclick="if(event.target === this) closeHelp()">
+        <div class="help-content">
+            <div class="p-5 border-b flex justify-between items-center" style="background: var(--oat-warm); border-color: var(--oat-beige);">
+                <div>
+                    <h2 class="text-lg font-semibold" style="color: var(--oat-espresso);">DuckDB Guide</h2>
+                    <p class="text-xs mt-0.5" style="color: var(--oat-stone);">Full CSV.GZ support with JS decompression</p>
+                </div>
+                <button onclick="closeHelp()" class="w-8 h-8 flex items-center justify-center rounded-lg transition-colors" style="color: var(--oat-stone); background: var(--oat-cream);">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div style="border-color: var(--oat-beige);">
+                <!-- Quick Start -->
+                <div class="p-5 border-b" style="border-color: var(--oat-beige);">
+                    <h3 class="text-sm font-semibold mb-3 flex items-center gap-2" style="color: var(--oat-espresso);">
+                        <i class="fas fa-rocket" style="color: var(--oat-accent);"></i> Quick Start
+                    </h3>
+                    <div class="grid grid-cols-2 gap-3 text-xs" style="color: var(--oat-charcoal);">
+                        <div class="flex items-start gap-2">
+                            <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] shrink-0 mt-0.5 text-white" style="background: var(--oat-accent);">1</span>
+                            <span><strong>Import:</strong> Drop CSV, CSV.GZ, JSON, Parquet files</span>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] shrink-0 mt-0.5 text-white" style="background: var(--oat-accent);">2</span>
+                            <span><strong>Autocomplete:</strong> Type for suggestions, Tab to accept</span>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] shrink-0 mt-0.5 text-white" style="background: var(--oat-accent);">3</span>
+                            <span><strong>Run:</strong> Ctrl+Enter to execute</span>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] shrink-0 mt-0.5 text-white" style="background: var(--oat-accent);">4</span>
+                            <span><strong>Export:</strong> Copy or download CSV</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Supported Files -->
+                <div class="p-5 border-b" style="border-color: var(--oat-beige);">
+                    <h3 class="text-sm font-semibold mb-3 flex items-center gap-2" style="color: var(--oat-espresso);">
+                        <i class="fas fa-file-import" style="color: var(--oat-accent);"></i> Supported Files
+                    </h3>
+                    <div class="flex flex-wrap">
+                        <span class="tag"><i class="fas fa-file-csv mr-1" style="color: var(--oat-success);"></i>CSV</span>
+                        <span class="tag"><i class="fas fa-compress-alt mr-1" style="color: #92400E;"></i>CSV.GZ</span>
+                        <span class="tag"><i class="fas fa-file-code mr-1" style="color: #60A5FA;"></i>JSON / JSONL</span>
+                        <span class="tag"><i class="fas fa-file-archive mr-1" style="color: #FBBF24;"></i>Parquet</span>
+                        <span class="tag"><i class="fas fa-file-excel mr-1" style="color: #34D399;"></i>Excel</span>
+                    </div>
+                    <p class="text-[10px] mt-2" style="color: var(--oat-stone);">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        CSV.GZ files are decompressed in JavaScript before loading into DuckDB for maximum compatibility.
+                    </p>
+                </div>
+
+                <!-- Basic SQL -->
+                <div class="p-5 border-b" style="border-color: var(--oat-beige);">
+                    <h3 class="text-sm font-semibold mb-3 flex items-center gap-2" style="color: var(--oat-espresso);">
+                        <i class="fas fa-code" style="color: var(--oat-accent);"></i> Essential Queries
+                    </h3>
+                    <div class="space-y-2">
+                        <div class="code-block">SELECT * FROM table_name LIMIT 100;</div>
+                        <div class="code-block">SELECT COUNT(*), AVG(price) FROM sales GROUP BY category;</div>
+                        <div class="code-block">COPY (SELECT * FROM table) TO 'output.csv' (HEADER);</div>
+                    </div>
+                </div>
+
+                <!-- Advanced SQL -->
+                <div class="p-5 border-b" style="border-color: var(--oat-beige);">
+                    <h3 class="text-sm font-semibold mb-3 flex items-center gap-2" style="color: var(--oat-espresso);">
+                        <i class="fas fa-graduation-cap" style="color: var(--oat-accent);"></i> Advanced Analytics
+                    </h3>
+                    
+                    <div class="mb-4">
+                        <p class="text-xs font-medium mb-1" style="color: var(--oat-charcoal);">Window Functions</p>
+                        <div class="code-block">SELECT 
+    product,
+    sales,
+    SUM(sales) OVER (ORDER BY date) as running_total,
+    RANK() OVER (PARTITION BY category ORDER BY sales DESC) as rank
+FROM sales;</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <p class="text-xs font-medium mb-1" style="color: var(--oat-charcoal);">Common Table Expressions (CTEs)</p>
+                        <div class="code-block">WITH top_products AS (
+    SELECT product, SUM(quantity) as total
+    FROM orders
+    GROUP BY product
+    ORDER BY total DESC
+    LIMIT 10
+)
+SELECT * FROM top_products;</div>
+                    </div>
+
+                    <div>
+                        <p class="text-xs font-medium mb-1" style="color: var(--oat-charcoal);">ASOF Join (Time-series)</p>
+                        <div class="code-block">SELECT trades.*, prices.price
+FROM trades
+ASOF JOIN prices 
+ON trades.symbol = prices.symbol 
+AND trades.time >= prices.time;</div>
+                    </div>
+                </div>
+
+                <!-- Tips -->
+                <div class="p-5" style="background: var(--oat-warm);">
+                    <h3 class="text-sm font-semibold mb-3 flex items-center gap-2" style="color: var(--oat-espresso);">
+                        <i class="fas fa-lightbulb" style="color: var(--oat-accent);"></i> Pro Tips
+                    </h3>
+                    <ul class="text-xs space-y-2 list-disc list-inside" style="color: var(--oat-charcoal);">
+                        <li><strong>SUMMARIZE table_name</strong> - Instant statistics on any table</li>
+                        <li><strong>DESCRIBE table_name</strong> - See column types</li>
+                        <li><strong>QUALIFY</strong> - Filter window functions without subqueries</li>
+                        <li><strong>FILTER (WHERE condition)</strong> - Conditional aggregates</li>
+                        <li>Press <kbd class="px-1 rounded" style="background: var(--oat-beige);">Tab</kbd> to accept autocomplete suggestions</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="p-4 border-t" style="background: var(--oat-warm); border-color: var(--oat-beige);">
+                <button onclick="closeHelp()" class="w-full py-2.5 rounded-lg text-sm font-medium text-white transition-colors" style="background: var(--oat-accent);">
+                    Start Exploring
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="h-14 border-b flex items-center justify-between px-4 shrink-0" style="background: var(--oat-cream); border-color: var(--oat-beige);">
+        <div class="flex items-center gap-3">
+            <div class="w-7 h-7 rounded-md flex items-center justify-center" style="background: var(--oat-accent);">
+                <i class="fas fa-database text-white text-xs"></i>
+            </div>
+            <div>
+                <h1 class="font-semibold text-sm tracking-tight" style="color: var(--oat-espresso);">DuckDB <span style="color: var(--oat-stone);">Oat</span></h1>
+            </div>
+        </div>
+        
+        <div class="flex items-center gap-2">
+            <button onclick="toggleTheme()" class="theme-toggle" title="Toggle theme">
+                <i class="fas fa-moon" id="themeIcon"></i>
+            </button>
+            <button onclick="openHelp()" class="btn-oat px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2">
+                <i class="fas fa-book-open" style="color: var(--oat-stone);"></i>
+                <span>Guide</span>
+            </button>
+            <input type="file" id="fileInput" class="hidden" accept=".csv,.csv.gz,.tsv,.txt,.parquet,.json,.jsonl,.ndjson,.xlsx,.xls,.gz,.bz2" multiple>
+            <button onclick="document.getElementById('fileInput').click()" class="btn-oat px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2">
+                <i class="fas fa-plus" style="color: var(--oat-stone);"></i>
+                <span>Import</span>
+            </button>
+            <button onclick="executeQuery()" class="btn-primary px-4 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2">
+                <i class="fas fa-play text-[10px]"></i>
+                <span>Run</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden">
+        <!-- Sidebar -->
+        <aside class="w-64 border-r flex flex-col shrink-0" style="background: var(--oat-cream); border-color: var(--oat-beige);">
+            <div class="p-3 border-b" style="border-color: var(--oat-beige);">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-semibold uppercase tracking-wider" style="color: var(--oat-stone);">Tables</span>
+                    <button onclick="refreshTables()" class="p-1 rounded transition-colors" style="color: var(--oat-stone);">
+                        <i class="fas fa-sync-alt text-xs"></i>
+                    </button>
+                </div>
+                <input type="text" id="tableSearch" placeholder="Search tables..." 
+                    class="w-full rounded-md px-3 py-1.5 text-xs focus:outline-none transition-all"
+                    style="background: var(--oat-warm); border: 1px solid var(--oat-beige); color: var(--oat-espresso);"
+                    oninput="filterTables(this.value)">
+            </div>
+            
+            <div id="dropZone" class="drop-zone mx-3 mt-3 p-3 text-center cursor-pointer" onclick="document.getElementById('fileInput').click()">
+                <i class="fas fa-cloud-upload-alt mb-1 text-lg" style="color: var(--oat-stone);"></i>
+                <p class="text-[10px] font-medium" style="color: var(--oat-charcoal);">Drop files here</p>
+                <p class="text-[9px] mt-0.5" style="color: var(--oat-stone);">CSV.GZ supported</p>
+            </div>
+            
+            <div id="tableList" class="flex-1 overflow-y-auto p-2 space-y-1">
+                <div class="text-xs text-center py-8 italic" style="color: var(--oat-stone);">No data loaded</div>
+            </div>
+        </aside>
+
+        <!-- Main -->
+        <main class="flex-1 flex flex-col min-w-0" style="background: var(--oat-cream);">
+            <!-- Editor -->
+            <div class="flex-1 flex flex-col min-h-0 border-b editor-wrap" style="border-color: var(--oat-beige);">
+                <div class="px-3 py-2 border-b flex justify-between items-center" style="background: var(--oat-warm); border-color: var(--oat-beige);">
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs font-medium uppercase tracking-wider" style="color: var(--oat-stone);">Editor</span>
+                        <div class="flex items-center gap-2 text-[10px]" style="color: var(--oat-stone);">
+                            <span class="px-1.5 py-0.5 rounded font-mono" style="background: var(--oat-cream); border: 1px solid var(--oat-beige);">Tab</span>
+                            <span>to complete</span>
+                            <span class="px-1.5 py-0.5 rounded font-mono ml-2" style="background: var(--oat-cream); border: 1px solid var(--oat-beige);">Ctrl+Enter</span>
+                            <span>to run</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="formatSQL()" class="text-[10px] px-2 py-1 rounded transition-colors" style="color: var(--oat-stone);">
+                            Format
+                        </button>
+                        <button onclick="clearEditor()" class="text-[10px] px-2 py-1 rounded transition-colors" style="color: var(--oat-stone);">
+                            Clear
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="relative flex-1">
+                    <textarea id="sqlEditor" class="w-full h-full p-4 resize-none focus:outline-none mono" 
+                        spellcheck="false" 
+                        placeholder="-- Write SQL here
+-- Supports: SELECT * FROM 'file.csv.gz'
+-- Press Tab for autocomplete, Ctrl+Enter to run"
+                        style="background: var(--oat-cream); color: var(--oat-espresso);"></textarea>
+                    
+                    <div id="inlineSuggestions" class="suggestions"></div>
+                </div>
+                
+                <div id="snippets" class="absolute bottom-4 left-4 flex gap-2 opacity-0 transition-opacity duration-300 pointer-events-none"></div>
+            </div>
+
+            <!-- Results -->
+            <div class="h-2/5 min-h-[200px] flex flex-col" style="background: var(--oat-warm);">
+                <div class="px-3 py-2 border-b flex justify-between items-center" style="background: var(--oat-cream); border-color: var(--oat-beige);">
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs font-medium uppercase tracking-wider" style="color: var(--oat-stone);">Results</span>
+                        <span id="resultStats" class="text-[10px] hidden" style="color: var(--oat-stone);"></span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="copyResults()" class="text-[10px] px-2 py-1 rounded transition-colors flex items-center gap-1" style="color: var(--oat-charcoal);">
+                            <i class="fas fa-copy text-[10px]"></i> Copy
+                        </button>
+                        <button onclick="exportCSV()" class="text-[10px] px-2 py-1 rounded transition-colors flex items-center gap-1" style="color: var(--oat-charcoal);">
+                            <i class="fas fa-file-csv text-[10px];"></i> CSV
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="resultsContainer" class="flex-1 overflow-auto relative" style="background: var(--oat-cream);">
+                    <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center" style="color: var(--oat-stone);">
+                        <i class="fas fa-table text-3xl mb-2 opacity-20"></i>
+                        <p class="text-xs">Run a query or drop a file</p>
+                        <p class="text-[10px] mt-1 opacity-60">CSV.GZ auto-decompressed</p>
+                    </div>
+                    <div id="loadingState" class="absolute inset-0 flex items-center justify-center hidden" style="background: var(--oat-cream);">
+                        <div class="loader"></div>
+                    </div>
+                    <table id="resultsTable" class="w-full data-table hidden">
+                        <thead class="sticky top-0"></thead>
+                        <tbody class="divide-y" style="border-color: var(--oat-beige);"></tbody>
+                    </table>
+                    <div id="errorState" class="absolute inset-0 flex items-center justify-center hidden p-6">
+                        <div class="rounded-lg p-4 max-w-md" style="background: var(--oat-warm); border: 1px solid var(--oat-error);">
+                            <p class="text-xs font-semibold mb-1" style="color: var(--oat-error);">Error</p>
+                            <p id="errorText" class="text-xs mono" style="color: var(--oat-charcoal);"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module">
+        let db = null, conn = null, currentResults = null, tables = [];
+        let columns = {};
+        
+        // Theme
+        function initTheme() {
+            const saved = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', saved);
+            updateThemeIcon(saved);
+        }
+        
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            updateThemeIcon(next);
+        }
+        
+        function updateThemeIcon(theme) {
+            document.getElementById('themeIcon').className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+        }
+        
+        initTheme();
+        window.toggleTheme = toggleTheme;
+        
+        // SQL completions
+        const completions = {
+            keywords: [
+                { name: 'SELECT', type: 'keyword', desc: 'Retrieve data' },
+                { name: 'FROM', type: 'keyword', desc: 'Specify table' },
+                { name: 'WHERE', type: 'keyword', desc: 'Filter rows' },
+                { name: 'GROUP BY', type: 'keyword', desc: 'Aggregate' },
+                { name: 'ORDER BY', type: 'keyword', desc: 'Sort' },
+                { name: 'LIMIT', type: 'keyword', desc: 'Limit rows' },
+                { name: 'JOIN', type: 'keyword', desc: 'Combine tables' },
+                { name: 'LEFT JOIN', type: 'keyword', desc: 'Keep all left' },
+                { name: 'ON', type: 'keyword', desc: 'Join condition' },
+                { name: 'AND', type: 'keyword', desc: 'Logical AND' },
+                { name: 'OR', type: 'keyword', desc: 'Logical OR' },
+                { name: 'WITH', type: 'keyword', desc: 'CTE' },
+            ],
+            functions: [
+                { name: 'COUNT(*)', type: 'function', desc: 'Count rows' },
+                { name: 'SUM(', type: 'function', desc: 'Sum values' },
+                { name: 'AVG(', type: 'function', desc: 'Average' },
+                { name: 'MIN(', type: 'function', desc: 'Minimum' },
+                { name: 'MAX(', type: 'function', desc: 'Maximum' },
+                { name: 'ROUND(', type: 'function', desc: 'Round number' },
+                { name: 'COALESCE(', type: 'function', desc: 'First non-null' },
+                { name: 'CAST(', type: 'function', desc: 'Type cast' },
+                { name: 'EXTRACT(YEAR FROM', type: 'function', desc: 'Extract year' },
+                { name: 'ROW_NUMBER()', type: 'function', desc: 'Row number' },
+                { name: 'RANK()', type: 'function', desc: 'Rank' },
+                { name: 'LAG(', type: 'function', desc: 'Previous row' },
+                { name: 'LEAD(', type: 'function', desc: 'Next row' },
+            ],
+            files: [
+                { name: "read_csv_auto('", type: 'file', desc: 'Auto-detect CSV' },
+                { name: "read_parquet('", type: 'file', desc: 'Read Parquet' },
+                { name: "read_json_auto('", type: 'file', desc: 'Auto-detect JSON' },
+            ]
+        };
+        
+        // Initialize DuckDB
+        try {
+            const duckdb = await import('https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/+esm');
+            const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
+            
+            const worker = new Worker(URL.createObjectURL(new Blob([`importScripts("${bundle.mainWorker}");`], { type: 'text/javascript' })));
+            db = new duckdb.AsyncDuckDB(new duckdb.ConsoleLogger(), worker);
+            await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+            conn = await db.connect();
+            
+            // Load extensions
+            ['parquet', 'json'].forEach(ext => {
+                conn.query(`INSTALL ${ext}; LOAD ${ext};`).catch(() => {});
+            });
+            
+            document.getElementById('loadingOverlay').style.display = 'none';
+            showToast('Ready! CSV.GZ files will be auto-decompressed', 'success', 4000);
+            
+            if (!localStorage.getItem('duckdb_visited')) {
+                await loadSampleData();
+                localStorage.setItem('duckdb_visited', 'true');
+            }
+            
+        } catch (error) {
+            document.getElementById('loadingOverlay').innerHTML = `
+                <div class="text-center p-4" style="color: var(--oat-error);">
+                    <p class="font-semibold mb-2">Failed to load</p>
+                    <p class="text-xs" style="color: var(--oat-stone);">${error.message}</p>
+                    <button onclick="location.reload()" class="mt-4 px-4 py-2 rounded text-xs text-white" style="background: var(--oat-accent);">Retry</button>
+                </div>
+            `;
+        }
+        
+        async function loadSampleData() {
+            await conn.query(`CREATE OR REPLACE TABLE sample_orders AS SELECT * FROM (VALUES (1, 'Widget', 150.00, '2024-01-15'), (2, 'Gadget', 299.99, '2024-01-16')) t(id, product, price, date)`);
+            refreshTables();
+        }
+        
+        // Toast system
+        function showToast(message, type = 'info', duration = 3000) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            const icon = type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle';
+            const color = type === 'success' ? 'text-[#7A9E7E]' : type === 'error' ? 'text-[#C17B7B]' : 'text-[#B8956A]';
+            
+            toast.innerHTML = `
+                <i class="fas fa-${icon} ${color}"></i>
+                <span class="flex-1 text-sm" style="color: var(--oat-espresso);">${message}</span>
+                <button onclick="this.parentElement.remove()" class="text-[10px]" style="color: var(--oat-stone);"><i class="fas fa-times"></i></button>
+            `;
+            
+            container.appendChild(toast);
+            requestAnimationFrame(() => toast.classList.add('show'));
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
+        
+        // FIXED: CSV.GZ Support with JS decompression
+        window.handleFileSelect = async function(e) {
+            const files = Array.from(e.target.files || e.dataTransfer?.files || []);
+            if (!files.length || !conn) return;
+            
+            for (const file of files) {
+                try {
+                    const fileName = file.name;
+                    const ext = fileName.split('.').pop().toLowerCase();
+                    const isGzipped = ext === 'gz';
+                    
+                    // Determine base name and type
+                    let baseName = fileName;
+                    let baseExt = ext;
+                    
+                    if (isGzipped) {
+                        baseName = fileName.replace(/\.gz$/, '');
+                        baseExt = baseName.split('.').pop().toLowerCase();
+                    }
+                    
+                    const tableName = baseName.replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 50);
+                    
+                    let arrayBuffer = await file.arrayBuffer();
+                    let finalFileName = fileName;
+                    let fileType = '';
+                    
+                    // Decompress GZIP in JavaScript if needed
+                    if (isGzipped) {
+                        showToast(`Decompressing ${fileName}...`, 'info', 2000);
+                        
+                        try {
+                            const decompressed = pako.ungzip(new Uint8Array(arrayBuffer));
+                            arrayBuffer = decompressed.buffer;
+                            finalFileName = baseName; // Use decompressed name
+                            fileType = baseExt.toUpperCase() + '.GZ';
+                        } catch (decompressErr) {
+                            console.error('Decompression error:', decompressErr);
+                            showToast(`Failed to decompress ${fileName}. Try importing as plain CSV.`, 'error', 5000);
+                            continue;
+                        }
+                    } else {
+                        fileType = ext.toUpperCase();
+                    }
+                    
+                    // Register file with DuckDB
+                    await db.registerFileBuffer(finalFileName, new Uint8Array(arrayBuffer));
+                    
+                    // Create table based on file type
+                    let sql = '';
+                    
+                    if (baseExt === 'csv' || baseExt === 'tsv' || baseExt === 'txt') {
+                        sql = `CREATE OR REPLACE TABLE ${tableName} AS SELECT * FROM read_csv_auto('${finalFileName}')`;
+                    } else if (baseExt === 'parquet') {
+                        sql = `CREATE OR REPLACE TABLE ${tableName} AS SELECT * FROM read_parquet('${finalFileName}')`;
+                    } else if (['json', 'jsonl', 'ndjson'].includes(baseExt)) {
+                        sql = `CREATE OR REPLACE TABLE ${tableName} AS SELECT * FROM read_json_auto('${finalFileName}')`;
+                    } else {
+                        throw new Error(`Unsupported file type: ${baseExt}`);
+                    }
+                    
+                    // Execute import
+                    await conn.query(sql);
+                    
+                    // Get stats
+                    const count = (await conn.query(`SELECT COUNT(*) as c FROM ${tableName}`)).toArray()[0].c;
+                    
+                    // Get column info
+                    const schemaResult = await conn.query(`DESCRIBE ${tableName}`);
+                    columns[tableName] = schemaResult.toArray().map(r => r.column_name);
+                    
+                    // Update UI
+                    document.getElementById('sqlEditor').value = `SELECT * FROM ${tableName} LIMIT 100;`;
+                    
+                    // Show success with compression badge if applicable
+                    const compressionBadge = isGzipped ? '<span class="compression-badge">GZ→CSV</span>' : '';
+                    showToast(`${fileType}: ${fileName} loaded ${compressionBadge} (${count.toLocaleString()} rows)`, 'success', 4000);
+                    
+                    refreshTables();
+                    
+                } catch (err) {
+                    console.error('Import error:', err);
+                    showToast(`Error: ${err.message}`, 'error', 5000);
+                }
+            }
+            e.target.value = '';
+        };
+        
+        // Drag & drop
+        const dropZone = document.getElementById('dropZone');
+        dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+        dropZone.addEventListener('drop', e => { e.preventDefault(); handleFileSelect(e); dropZone.classList.remove('drag-over'); });
+        
+        // Metabase-style autocomplete
+        const editor = document.getElementById('sqlEditor');
+        const suggestionsBox = document.getElementById('inlineSuggestions');
+        let selectedIdx = -1;
+        let currentMatches = [];
+        let currentWord = '';
+        let wordStart = 0;
+        let wordEnd = 0;
+        
+        function getCurrentWord() {
+            const pos = editor.selectionStart;
+            const text = editor.value;
+            let start = pos;
+            let end = pos;
+            
+            while (start > 0 && /[a-zA-Z0-9_.']/.test(text[start - 1])) start--;
+            while (end < text.length && /[a-zA-Z0-9_.']/.test(text[end])) end++;
+            
+            return { word: text.substring(start, end), start, end, pos };
+        }
+        
+        function updateSuggestions() {
+            const { word, start, end } = getCurrentWord();
+            currentWord = word;
+            wordStart = start;
+            wordEnd = end;
+            
+            if (word.length < 1) {
+                hideSuggestions();
+                return;
+            }
+            
+            const upperWord = word.toUpperCase();
+            const matches = [];
+            
+            completions.keywords.forEach(k => {
+                if (k.name.startsWith(upperWord)) {
+                    matches.push({ ...k, display: k.name, category: 'Keywords' });
+                }
+            });
+            
+            completions.functions.forEach(f => {
+                if (f.name.toUpperCase().startsWith(upperWord)) {
+                    matches.push({ ...f, display: f.name, category: 'Functions' });
+                }
+            });
+            
+            tables.forEach(t => {
+                if (t.toLowerCase().startsWith(word.toLowerCase())) {
+                    matches.push({ name: t, type: 'table', desc: 'Table', display: t, category: 'Tables' });
+                }
+            });
+            
+            Object.entries(columns).forEach(([table, cols]) => {
+                cols.forEach(col => {
+                    if (col.toLowerCase().startsWith(word.toLowerCase())) {
+                        matches.push({ 
+                            name: col, 
+                            type: 'column', 
+                            desc: `${table}.${col}`, 
+                            display: col,
+                            category: 'Columns'
+                        });
+                    }
+                });
+            });
+            
+            completions.files.forEach(f => {
+                if (f.name.toUpperCase().includes(upperWord)) {
+                    matches.push({ ...f, display: f.name, category: 'Files' });
+                }
+            });
+            
+            currentMatches = matches.slice(0, 10);
+            
+            if (currentMatches.length > 0) {
+                showSuggestions(currentMatches);
+            } else {
+                hideSuggestions();
+            }
+        }
+        
+        function showSuggestions(matches) {
+            suggestionsBox.innerHTML = '';
+            selectedIdx = 0;
+            
+            const grouped = {};
+            matches.forEach(m => {
+                if (!grouped[m.category]) grouped[m.category] = [];
+                grouped[m.category].push(m);
+            });
+            
+            Object.entries(grouped).forEach(([category, items]) => {
+                const header = document.createElement('div');
+                header.className = 'suggestion-header';
+                header.textContent = category;
+                suggestionsBox.appendChild(header);
+                
+                items.forEach((item, idx) => {
+                    const div = document.createElement('div');
+                    div.className = 'suggestion-item';
+                    if (idx === 0 && Object.keys(grouped).indexOf(category) === 0) div.classList.add('selected');
+                    
+                    let iconClass = 'icon-keyword';
+                    let icon = 'fa-key';
+                    if (item.type === 'table') { iconClass = 'icon-table'; icon = 'fa-table'; }
+                    else if (item.type === 'column') { iconClass = 'icon-column'; icon = 'fa-columns'; }
+                    else if (item.type === 'function') { iconClass = 'icon-function'; icon = 'fa-function'; }
+                    else if (item.type === 'file') { iconClass = 'icon-file'; icon = 'fa-file'; }
+                    
+                    div.innerHTML = `
+                        <div class="suggestion-icon ${iconClass}"><i class="fas ${icon}"></i></div>
+                        <div class="flex-1">
+                            <div class="suggestion-title">${highlightMatch(item.display, currentWord)}</div>
+                            <div class="suggestion-desc">${item.desc}</div>
+                        </div>
+                        ${idx === 0 && Object.keys(grouped).indexOf(category) === 0 ? '<span class="suggestion-shortcut">Tab</span>' : ''}
+                    `;
+                    
+                    div.onclick = () => acceptSuggestion(item);
+                    suggestionsBox.appendChild(div);
+                });
+            });
+            
+            suggestionsBox.style.display = 'block';
+            const lines = editor.value.substring(0, wordStart).split('\n');
+            const lineHeight = 20;
+            const top = Math.min(lines.length * lineHeight + 60, editor.clientHeight - 200);
+            suggestionsBox.style.top = top + 'px';
+            suggestionsBox.style.left = '20px';
+        }
+        
+        function highlightMatch(text, query) {
+            const idx = text.toLowerCase().indexOf(query.toLowerCase());
+            if (idx === -1) return text;
+            return text.substring(0, idx) + 
+                   `<span style="color: var(--oat-accent); font-weight: 600;">${text.substring(idx, idx + query.length)}</span>` + 
+                   text.substring(idx + query.length);
+        }
+        
+        function hideSuggestions() {
+            suggestionsBox.style.display = 'none';
+            selectedIdx = -1;
+            currentMatches = [];
+        }
+        
+        function acceptSuggestion(item) {
+            const before = editor.value.substring(0, wordStart);
+            const after = editor.value.substring(wordEnd);
+            editor.value = before + item.display + after;
+            hideSuggestions();
+            editor.focus();
+            const newPos = wordStart + item.display.length;
+            editor.setSelectionRange(newPos, newPos);
+        }
+        
+        editor.addEventListener('keydown', e => {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                
+                if (suggestionsBox.style.display === 'block' && currentMatches.length > 0) {
+                    let selectedItem = currentMatches[0];
+                    if (selectedIdx >= 0 && selectedIdx < currentMatches.length) {
+                        selectedItem = currentMatches[selectedIdx];
+                    }
+                    acceptSuggestion(selectedItem);
+                } else {
+                    const pos = editor.selectionStart;
+                    editor.value = editor.value.substring(0, pos) + '    ' + editor.value.substring(pos);
+                    editor.setSelectionRange(pos + 4, pos + 4);
+                }
+                return;
+            }
+            
+            if (e.ctrlKey && e.key === 'Enter') {
+                executeQuery();
+                return;
+            }
+            
+            if (suggestionsBox.style.display === 'block') {
+                const items = suggestionsBox.querySelectorAll('.suggestion-item');
+                
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    selectedIdx = (selectedIdx + 1) % currentMatches.length;
+                    updateSelection(items);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    selectedIdx = selectedIdx <= 0 ? currentMatches.length - 1 : selectedIdx - 1;
+                    updateSelection(items);
+                } else if (e.key === 'Enter' && selectedIdx >= 0) {
+                    e.preventDefault();
+                    acceptSuggestion(currentMatches[selectedIdx]);
+                } else if (e.key === 'Escape') {
+                    hideSuggestions();
+                }
+            }
+        });
+        
+        function updateSelection(items) {
+            items.forEach((item, i) => {
+                item.classList.toggle('selected', i === selectedIdx);
+                const shortcut = item.querySelector('.suggestion-shortcut');
+                if (shortcut) shortcut.textContent = i === selectedIdx ? 'Tab' : '';
+            });
+        }
+        
+        editor.addEventListener('input', updateSuggestions);
+        editor.addEventListener('blur', () => setTimeout(hideSuggestions, 200));
+        
+        window.executeQuery = async function() {
+            if (!conn) return;
+            const sql = editor.value.trim();
+            if (!sql) { showToast('Enter a query', 'warning', 2000); return; }
+            
+            showLoading(true);
+            document.getElementById('errorState').classList.add('hidden');
+            
+            try {
+                const start = performance.now();
+                const result = await conn.query(sql);
+                const ms = (performance.now() - start).toFixed(0);
+                
+                displayResults(result, ms);
+                currentResults = result;
+                if (sql.match(/CREATE|DROP|INSERT/i)) refreshTables();
+                
+            } catch (err) {
+                document.getElementById('errorText').textContent = err.message;
+                document.getElementById('errorState').classList.remove('hidden');
+                document.getElementById('resultsTable').classList.add('hidden');
+                document.getElementById('emptyState').classList.add('hidden');
+            }
+            showLoading(false);
+        };
+        
+        function displayResults(result, ms) {
+            const table = document.getElementById('resultsTable');
+            const thead = table.querySelector('thead');
+            const tbody = table.querySelector('tbody');
+            
+            document.getElementById('emptyState').classList.add('hidden');
+            table.classList.remove('hidden');
+            thead.innerHTML = ''; tbody.innerHTML = '';
+            
+            const schema = result.schema;
+            const rows = result.toArray();
+            
+            const tr = document.createElement('tr');
+            schema.fields.forEach(f => {
+                const th = document.createElement('th');
+                th.className = 'px-3 py-2 text-left';
+                th.innerHTML = `${f.name}<div class="text-[9px] opacity-60 font-normal mt-0.5">${f.type}</div>`;
+                tr.appendChild(th);
+            });
+            thead.appendChild(tr);
+            
+            rows.slice(0, 1000).forEach((row, i) => {
+                const tr = document.createElement('tr');
+                tr.style.background = i % 2 ? 'var(--oat-warm)' : 'var(--oat-cream)';
+                schema.fields.forEach(f => {
+                    const td = document.createElement('td');
+                    td.className = 'px-3 py-2';
+                    const v = row[f.name];
+                    td.textContent = v === null ? 'NULL' : String(v);
+                    if (v === null) td.style.color = 'var(--oat-stone)';
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+            
+            document.getElementById('resultStats').textContent = `${rows.length} rows • ${ms}ms`;
+            document.getElementById('resultStats').classList.remove('hidden');
+        }
+        
+        window.refreshTables = async function() {
+            if (!conn) return;
+            const res = await conn.query(`SELECT table_name FROM information_schema.tables WHERE table_schema='main' ORDER BY table_name`);
+            tables = res.toArray().map(r => r.table_name);
+            const list = document.getElementById('tableList');
+            
+            if (!tables.length) {
+                list.innerHTML = '<div class="text-xs text-center py-8 italic" style="color: var(--oat-stone);">No tables</div>';
+                return;
+            }
+            
+            list.innerHTML = '';
+            tables.forEach(t => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center gap-2 px-2 py-1.5 text-xs rounded cursor-pointer group transition-colors';
+                div.style.color = 'var(--oat-charcoal)';
+                div.innerHTML = `<i class="fas fa-table" style="color: var(--oat-stone);"></i><span class="font-mono">${t}</span>`;
+                div.onclick = () => {
+                    editor.value = `SELECT * FROM "${t}" LIMIT 100;`;
+                    document.querySelectorAll('#tableList > div').forEach(d => d.style.background = '');
+                    div.style.background = 'var(--oat-beige)';
+                };
+                list.appendChild(div);
+            });
+            
+            const snippets = document.getElementById('snippets');
+            if (tables.length) {
+                snippets.innerHTML = '';
+                snippets.style.opacity = '1';
+                snippets.classList.remove('pointer-events-none');
+                [['Preview', `SELECT * FROM ${tables[0]} LIMIT 10`], ['Count', `SELECT COUNT(*) FROM ${tables[0]}`], ['Stats', `SUMMARIZE ${tables[0]}`]].forEach(([label, sql]) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'px-3 py-1.5 rounded-full text-[10px] font-medium transition-colors border';
+                    btn.style.background = 'var(--oat-cream)';
+                    btn.style.borderColor = 'var(--oat-beige)';
+                    btn.style.color = 'var(--oat-charcoal)';
+                    btn.textContent = label;
+                    btn.onclick = () => { editor.value = sql + ';'; executeQuery(); };
+                    snippets.appendChild(btn);
+                });
+            }
+        };
+        
+        window.filterTables = function(v) {
+            const lower = v.toLowerCase();
+            document.querySelectorAll('#tableList > div').forEach(d => {
+                d.style.display = d.textContent.toLowerCase().includes(lower) ? '' : 'none';
+            });
+        };
+        
+        window.formatSQL = function() {
+            let sql = editor.value;
+            ['select','from','where','group by','order by','join','left','inner','on','and','or','create','table','insert','values','update','delete','drop','with'].forEach(kw => {
+                sql = sql.replace(new RegExp(`\\b${kw}\\b`, 'gi'), kw.toUpperCase());
+            });
+            editor.value = sql.replace(/\b(SELECT|FROM|WHERE|GROUP BY|ORDER BY|JOIN|WITH|CREATE|INSERT|UPDATE|DELETE|DROP)\b/g, '\n$1').trim();
+        };
+        
+        window.clearEditor = function() {
+            editor.value = '';
+            hideSuggestions();
+        };
+        
+        window.copyResults = function() {
+            if (!currentResults) return;
+            const rows = currentResults.toArray();
+            const schema = currentResults.schema;
+            let text = schema.fields.map(f => f.name).join('\t') + '\n';
+            rows.forEach(r => text += schema.fields.map(f => r[f.name] === null ? '' : String(r[f.name])).join('\t') + '\n');
+            navigator.clipboard.writeText(text);
+            showToast('Copied to clipboard', 'success', 2000);
+        };
+        
+        window.exportCSV = function() {
+            if (!currentResults) { showToast('No results', 'warning', 2000); return; }
+            const rows = currentResults.toArray();
+            const schema = currentResults.schema;
+            let csv = schema.fields.map(f => f.name).join(',') + '\n';
+            rows.forEach(r => {
+                csv += schema.fields.map(f => {
+                    const v = r[f.name];
+                    if (v === null) return '';
+                    const s = String(v);
+                    return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
+                }).join(',') + '\n';
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `results_${Date.now()}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('CSV exported', 'success', 2000);
+        };
+        
+        function showLoading(show) {
+            document.getElementById('loadingState').classList.toggle('hidden', !show);
+        }
+        
+        window.openHelp = function() {
+            document.getElementById('helpModal').classList.add('show');
+        };
+        window.closeHelp = function() {
+            document.getElementById('helpModal').classList.remove('show');
+        };
+        
+        document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+    </script>
+</body>
+</html>
