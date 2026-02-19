@@ -11,34 +11,34 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,300;1,400;1,700&display=swap" rel="stylesheet">
     <style>
-        /* THEME SYSTEM: Oat | Modern | Dark */
-        :root, [data-theme="oat"] {
-            --bg-primary: #FDFBF7; --bg-secondary: #F5F1EB; --bg-tertiary: #E8E2D9;
-            --border-color: #D4CFC7; --text-muted: #A8A39A; --text-secondary: #5C5852;
-            --text-primary: #3D3A36; --accent: #B8956A; --accent-hover: #9A7B56;
-            --success: #7A9E7E; --error: #C17B7B; --shadow: rgba(0,0,0,0.08);
-            --font-serif: 'Merriweather', serif; --font-sans: 'Inter', sans-serif;
+        :root {
+            --oat-cream: #FDFBF7;
+            --oat-warm: #F5F1EB;
+            --oat-beige: #E8E2D9;
+            --oat-taupe: #D4CFC7;
+            --oat-stone: #A8A39A;
+            --oat-charcoal: #5C5852;
+            --oat-espresso: #3D3A36;
+            --oat-accent: #B8956A;
+            --oat-accent-hover: #9A7B56;
+            --oat-success: #7A9E7E;
+            --oat-error: #C17B7B;
+            --font-serif: 'Merriweather', serif;
+            --font-sans: 'Inter', sans-serif;
             --font-mono: 'JetBrains Mono', monospace;
         }
-        [data-theme="modern"] {
-            --bg-primary: #FFFFFF; --bg-secondary: #F8FAFC; --bg-tertiary: #F1F5F9;
-            --border-color: #E2E8F0; --text-muted: #94A3B8; --text-secondary: #64748B;
-            --text-primary: #0F172A; --accent: #3B82F6; --accent-hover: #2563EB;
-            --success: #10B981; --error: #EF4444; --shadow: rgba(0,0,0,0.04);
-        }
         [data-theme="dark"] {
-            --bg-primary: #0F172A; --bg-secondary: #1E293B; --bg-tertiary: #334155;
-            --border-color: #475569; --text-muted: #94A3B8; --text-secondary: #CBD5E1;
-            --text-primary: #F8FAFC; --accent: #60A5FA; --accent-hover: #3B82F6;
-            --success: #34D399; --error: #F87171; --shadow: rgba(0,0,0,0.3);
-        }
-        :root {
-            --oat-cream: var(--bg-primary); --oat-warm: var(--bg-secondary);
-            --oat-beige: var(--bg-tertiary); --oat-taupe: var(--border-color);
-            --oat-stone: var(--text-muted); --oat-charcoal: var(--text-secondary);
-            --oat-espresso: var(--text-primary); --oat-accent: var(--accent);
-            --oat-accent-hover: var(--accent-hover); --oat-success: var(--success);
-            --oat-error: var(--error);
+            --oat-cream: #1C1917;
+            --oat-warm: #292524;
+            --oat-beige: #44403C;
+            --oat-taupe: #57534E;
+            --oat-stone: #A8A29E;
+            --oat-charcoal: #D6D3D1;
+            --oat-espresso: #FAFAF9;
+            --oat-accent: #D4A373;
+            --oat-accent-hover: #E4B48A;
+            --oat-success: #86EFAC;
+            --oat-error: #FCA5A5;
         }
         * { transition: background-color 0.2s, border-color 0.2s, color 0.2s; }
         body { font-family: var(--font-sans); background: var(--oat-cream); color: var(--oat-espresso); }
@@ -280,12 +280,22 @@
         let isHorizontal = false; // layout state
         let splitRatio = 0.6; // default 60% editor, 40% results
 
-        // ---------- THEME SYSTEM ----------
-        const themes=['oat','modern','dark'], icons={oat:'fa-coffee',modern:'fa-sun',dark:'fa-moon'}, labels={oat:'Oat',modern:'Modern',dark:'Dark'};
-        function initTheme(){let s=localStorage.getItem('theme')||'oat';if(!themes.includes(s))s='oat';setTheme(s);}
-        function setTheme(n){document.documentElement.setAttribute('data-theme',n);localStorage.setItem('theme',n);let i=document.getElementById('themeIcon');if(i)i.className=`fas ${icons[n]} text-xs`;}
-        function toggleTheme(){let c=document.documentElement.getAttribute('data-theme')||'oat',n=themes[(themes.indexOf(c)+1)%themes.length];setTheme(n);showToast(`${labels[n]} Theme`,'success',1500);}
-        initTheme();window.toggleTheme=toggleTheme;
+        // ---------- THEME ----------
+        function initTheme() {
+            const saved = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', saved);
+            updateThemeIcon(saved);
+        }
+        function toggleTheme() {
+            const cur = document.documentElement.getAttribute('data-theme');
+            const nxt = cur === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', nxt);
+            localStorage.setItem('theme', nxt);
+            updateThemeIcon(nxt);
+        }
+        function updateThemeIcon(t) { document.getElementById('themeIcon').className = t === 'dark' ? 'fas fa-sun text-xs' : 'fas fa-moon text-xs'; }
+        initTheme();
+        window.toggleTheme = toggleTheme;
 
         // ---------- LAYOUT ----------
         function applySplit() {
