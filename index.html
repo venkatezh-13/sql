@@ -203,6 +203,18 @@ body{font-family:var(--ui);background:var(--bg);color:var(--text);height:100vh;d
 #jview.on{display:block}
 #jpre{font-family:var(--mono);font-size:12px;color:var(--text);line-height:1.6;white-space:pre-wrap;word-break:break-all}
 
+/* ── IMPORT PROGRESS ── */
+#import-progress{
+  display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);
+  padding:12px 18px;z-index:9998;min-width:320px;max-width:480px;
+  box-shadow:0 4px 20px rgba(0,0,0,.5);
+}
+#import-progress.on{display:block}
+.prog-title{font-size:12px;color:var(--text2);margin-bottom:8px;font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prog-bar-wrap{height:6px;background:var(--bg4);border-radius:3px;overflow:hidden;margin-bottom:6px}
+.prog-bar{height:100%;background:var(--accent);border-radius:3px;transition:width .1s;width:0%}
+.prog-sub{font-size:10px;color:var(--text3);font-family:var(--mono)}
 #toast{position:fixed;bottom:20px;right:20px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:10px 16px;font-size:12px;color:var(--text);z-index:9999;opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;max-width:340px}
 #toast.on{opacity:1;transform:translateY(0)}
 #toast.ok{border-color:var(--green)}
@@ -339,6 +351,11 @@ body{font-family:var(--ui);background:var(--bg);color:var(--text);height:100vh;d
   </div>
 </div>
 
+<div id="import-progress">
+  <div class="prog-title" id="prog-title">Importing…</div>
+  <div class="prog-bar-wrap"><div class="prog-bar" id="prog-bar"></div></div>
+  <div class="prog-sub" id="prog-sub"></div>
+</div>
 <div id="toast"></div>
 
 <script>
@@ -429,149 +446,253 @@ function castVal(v, type) {
 const dz = document.getElementById('dropz');
 const fi = document.getElementById('finput');
 dz.addEventListener('click', ()=> fi.click());
-fi.addEventListener('change', e=>{ importFiles([...e.target.files]); fi.value=''; });
+fi.addEventListener('change', e=>{ readAndImport([...e.target.files]); fi.value=''; });
 dz.addEventListener('dragover',  e=>{ e.preventDefault(); dz.classList.add('over'); });
 dz.addEventListener('dragleave', ()=> dz.classList.remove('over'));
-dz.addEventListener('drop', e=>{ e.preventDefault(); dz.classList.remove('over'); importFiles([...e.dataTransfer.files]); });
+dz.addEventListener('drop', e=>{ e.preventDefault(); dz.classList.remove('over'); readAndImport([...e.dataTransfer.files]); });
 
-async function importFiles(files) {
-  for (const f of files) await importOne(f);
-  // Single sidebar refresh after ALL files are loaded
+// CRITICAL: read all bytes immediately inside the event handler BEFORE any awaits.
+// File handles go stale after the event loop tick on large files.
+async function readAndImport(files) {
+  const items = files.map(f => ({
+    name: f.name,
+    size: f.size,
+    bufferPromise: f.arrayBuffer()
+  }));
+  for (const item of items) {
+    await importOne(item);
+  }
   refreshSidebar();
   setStatus('ready','Ready');
 }
 
-// Decompress a gzip ArrayBuffer using the native DecompressionStream API
+// ── PROGRESS UI ─────────────────────────────────────────
+function showProgress(title, pct, sub) {
+  const el = document.getElementById('import-progress');
+  el.className = 'on';
+  document.getElementById('prog-title').textContent = title;
+  document.getElementById('prog-bar').style.width = pct + '%';
+  document.getElementById('prog-sub').textContent  = sub;
+}
+function hideProgress() {
+  document.getElementById('import-progress').className = '';
+}
+// Yield to browser so UI can update between chunks
+function yieldToBrowser() {
+  return new Promise(r => setTimeout(r, 0));
+}
+function fmtBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(1) + ' MB';
+}
+
+// ── STREAMING GUNZIP ─────────────────────────────────────
+// Decompresses in streaming fashion and returns text without
+// building one giant concatenated Uint8Array first
 async function gunzip(arrayBuffer) {
-  const ds = new DecompressionStream('gzip');
+  showProgress('Decompressing…', 5, fmtBytes(arrayBuffer.byteLength) + ' compressed');
+  await yieldToBrowser();
+  const ds     = new DecompressionStream('gzip');
   const writer = ds.writable.getWriter();
-  writer.write(new Uint8Array(arrayBuffer));
+  // Feed in 4 MB chunks so the browser stays responsive
+  const CHUNK = 4 * 1024 * 1024;
+  const src   = new Uint8Array(arrayBuffer);
+  for (let i = 0; i < src.length; i += CHUNK) {
+    writer.write(src.slice(i, i + CHUNK));
+    showProgress('Decompressing…', 5 + Math.round((i / src.length) * 20),
+      fmtBytes(i) + ' / ' + fmtBytes(src.length));
+    await yieldToBrowser();
+  }
   writer.close();
-  const chunks = [];
+  // Collect decoded output chunks
   const reader = ds.readable.getReader();
+  const chunks = [];
+  let totalBytes = 0;
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
     chunks.push(value);
+    totalBytes += value.length;
   }
-  const total = chunks.reduce((n, c) => n + c.length, 0);
-  const out = new Uint8Array(total);
-  let off = 0;
-  for (const c of chunks) { out.set(c, off); off += c.length; }
-  return new TextDecoder().decode(out);
+  showProgress('Decoding text…', 25, fmtBytes(totalBytes) + ' decompressed');
+  await yieldToBrowser();
+  // Decode all chunks at once (TextDecoder handles multi-byte chars correctly)
+  const blob = new Blob(chunks);
+  return blob.text();
 }
 
-async function importOne(file) {
+// ── IMPORT ENTRY POINT ───────────────────────────────────
+// item = {name, size, bufferPromise} — bytes already reading in background
+async function importOne(item) {
   if (!DB) { toast('DB not ready','er'); return; }
-  const fname = file.name.toLowerCase();
+  const fname = item.name.toLowerCase();
   const isGz  = fname.endsWith('.gz');
-  // Strip extensions to make a clean table name
-  const base  = file.name
+  const base  = item.name
     .replace(/\.gz$/i,'').replace(/\.[^.]+$/,'')
     .replace(/[^a-zA-Z0-9_]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'') || 'table';
 
-  // Guarantee unique table name
   let tname = base, n = 2;
   const existing = DB.exec("SELECT name FROM sqlite_master WHERE type='table'");
   const taken = new Set(existing.length ? existing[0].values.map(r=>r[0]) : []);
   while (taken.has(tname)) tname = base+'_'+n++;
 
-  toast(`Importing ${file.name}…`);
-  setStatus('busy','Importing…');
+  showProgress('Reading ' + item.name + '...', 2, fmtBytes(item.size));
+  setStatus('busy','Importing...');
   try {
+    // Await the buffer that started reading back in readAndImport()
+    const arrayBuf = await item.bufferPromise;
+
     let text;
     if (isGz) {
-      // Decompress gzip in-browser using DecompressionStream
-      const buf = await file.arrayBuffer();
-      text = await gunzip(buf);
+      text = await gunzip(arrayBuf);
     } else {
-      text = await file.text();
+      showProgress('Decoding ' + item.name + '...', 15, fmtBytes(item.size));
+      await yieldToBrowser();
+      text = new TextDecoder().decode(arrayBuf);
     }
 
-    // Determine inner file type (csv.gz → csv, tsv.gz → tsv, json.gz → json)
-    const inner = fname.replace(/\.gz$/,'');
+    const inner = fname.replace(/\.gz$/, '');
     const ext   = inner.split('.').pop();
 
-    if (ext==='json')    await importJSON(text, tname);
-    else if (ext==='tsv') await importCSV(text, tname, '\t');
-    else                  await importCSV(text, tname, ',');
+    if (ext === 'json')      await importJSON(text, tname);
+    else if (ext === 'tsv')  await importCSV(text, tname, '\t');
+    else                     await importCSV(text, tname, ',');
 
-    // Count rows directly from DB for the toast message
-    const cnt = DB.exec(`SELECT COUNT(*) FROM "${tname}"`);
+    const cnt = DB.exec('SELECT COUNT(*) FROM "' + tname + '"');
     const rowCount = cnt.length ? cnt[0].values[0][0] : 0;
-    toast(`✓ Loaded "${tname}" — ${Number(rowCount).toLocaleString()} rows`,'ok');
-    setStatus('busy','Loading…');
-    ed().setValue(`SELECT * FROM "${tname}" LIMIT 100;`);
-    // Note: caller (importFiles) does the final sidebar refresh
+    hideProgress();
+    toast('Loaded "' + tname + '" - ' + Number(rowCount).toLocaleString() + ' rows', 'ok');
+    setStatus('busy','Loading...');
+    ed().setValue('SELECT * FROM "' + tname + '" LIMIT 100;');
   } catch(e) {
-    toast(`Import failed: ${e.message.slice(0,100)}`,'er');
+    hideProgress();
+    toast('Import failed: ' + e.message.slice(0,120), 'er');
     setStatus('ready','Error');
     console.error(e);
   }
 }
 
+// ── CSV IMPORT — chunked inserts, yields every 5000 rows ─
 async function importCSV(text, tname, delim=',') {
+  showProgress('Parsing CSV…', 28, '');
+  await yieldToBrowser();
+
+  // Use PapaParse streaming: header from first chunk only
   const parsed = Papa.parse(text, {
-    header:true, skipEmptyLines:'greedy', delimiter:delim, dynamicTyping:false
+    header: true, skipEmptyLines: 'greedy', delimiter: delim, dynamicTyping: false
   });
   if (!parsed.data.length) throw new Error('No rows found');
   const cols = parsed.meta.fields.filter(Boolean);
   if (!cols.length) throw new Error('No columns found');
 
-  // Infer types from a sample (first 300 rows) — fast and accurate enough
-  const sample = parsed.data.slice(0, 300);
-  const types = {};
-  cols.forEach(c => { types[c] = inferColType(sample.map(r=>r[c])); });
+  const total = parsed.data.length;
+  showProgress('Inferring column types…', 32, `${total.toLocaleString()} rows`);
+  await yieldToBrowser();
 
-  const defs = cols.map(c=>`"${c.replace(/"/g,'""')}" ${types[c]}`).join(',');
+  // Sample 500 evenly-spaced rows for type inference (fast + representative)
+  const step   = Math.max(1, Math.floor(total / 500));
+  const sample = [];
+  for (let i = 0; i < total; i += step) sample.push(parsed.data[i]);
+  const types = {};
+  cols.forEach(c => { types[c] = inferColType(sample.map(r => r[c])); });
+
+  const defs = cols.map(c => `"${c.replace(/"/g,'""')}" ${types[c]}`).join(',');
   DB.run(`CREATE TABLE IF NOT EXISTS "${tname}" (${defs})`);
 
-  const ph = cols.map(()=>'?').join(',');
+  const ph   = cols.map(() => '?').join(',');
   const stmt = DB.prepare(`INSERT INTO "${tname}" VALUES (${ph})`);
-  DB.run('BEGIN TRANSACTION');
+
+  // Insert in chunks of 5000 rows per transaction, yield between each chunk
+  const CHUNK = 5000;
+  let inserted = 0;
   try {
-    for (const row of parsed.data) {
-      stmt.run(cols.map(c=>castVal(row[c], types[c])));
+    while (inserted < total) {
+      const end   = Math.min(inserted + CHUNK, total);
+      const pct   = 35 + Math.round((inserted / total) * 60);
+      showProgress(
+        `Inserting rows… ${inserted.toLocaleString()} / ${total.toLocaleString()}`,
+        pct,
+        `chunk ${Math.floor(inserted/CHUNK)+1} / ${Math.ceil(total/CHUNK)}`
+      );
+      await yieldToBrowser();
+
+      DB.run('BEGIN TRANSACTION');
+      for (let i = inserted; i < end; i++) {
+        stmt.run(cols.map(c => castVal(parsed.data[i][c], types[c])));
+      }
+      DB.run('COMMIT');
+      inserted = end;
     }
-    DB.run('COMMIT');
   } catch(e) {
-    DB.run('ROLLBACK');
+    try { DB.run('ROLLBACK'); } catch(_) {}
     throw e;
   } finally {
     stmt.free();
   }
+  showProgress('Finalizing…', 97, `${total.toLocaleString()} rows inserted`);
+  await yieldToBrowser();
 }
 
+// ── JSON IMPORT — chunked ────────────────────────────────
 async function importJSON(text, tname) {
+  showProgress('Parsing JSON…', 28, '');
+  await yieldToBrowser();
+
   let data = JSON.parse(text);
   if (!Array.isArray(data)) {
-    const key = Object.keys(data).find(k=>Array.isArray(data[k]));
+    const key = Object.keys(data).find(k => Array.isArray(data[k]));
     if (key) data = data[key];
     else throw new Error('JSON must be an array or have an array property');
   }
   if (!data.length) throw new Error('Empty JSON array');
 
-  const cols = [...new Set(data.flatMap(Object.keys))];
-  const types = {};
-  cols.forEach(c => { types[c] = inferColType(data.map(r=>r[c]??null)); });
+  const total = data.length;
+  const cols  = [...new Set(data.flatMap(Object.keys))];
 
-  const defs = cols.map(c=>`"${c.replace(/"/g,'""')}" ${types[c]}`).join(',');
+  showProgress('Inferring column types…', 32, `${total.toLocaleString()} rows`);
+  await yieldToBrowser();
+
+  const step   = Math.max(1, Math.floor(total / 500));
+  const sample = [];
+  for (let i = 0; i < total; i += step) sample.push(data[i]);
+  const types = {};
+  cols.forEach(c => { types[c] = inferColType(sample.map(r => r[c] ?? null)); });
+
+  const defs = cols.map(c => `"${c.replace(/"/g,'""')}" ${types[c]}`).join(',');
   DB.run(`CREATE TABLE IF NOT EXISTS "${tname}" (${defs})`);
 
-  const ph = cols.map(()=>'?').join(',');
+  const ph   = cols.map(() => '?').join(',');
   const stmt = DB.prepare(`INSERT INTO "${tname}" VALUES (${ph})`);
-  DB.run('BEGIN TRANSACTION');
+
+  const CHUNK = 5000;
+  let inserted = 0;
   try {
-    for (const row of data) {
-      stmt.run(cols.map(c=>castVal(row[c]??null, types[c])));
+    while (inserted < total) {
+      const end = Math.min(inserted + CHUNK, total);
+      const pct = 35 + Math.round((inserted / total) * 60);
+      showProgress(
+        `Inserting rows… ${inserted.toLocaleString()} / ${total.toLocaleString()}`,
+        pct,
+        `chunk ${Math.floor(inserted/CHUNK)+1} / ${Math.ceil(total/CHUNK)}`
+      );
+      await yieldToBrowser();
+
+      DB.run('BEGIN TRANSACTION');
+      for (let i = inserted; i < end; i++) {
+        stmt.run(cols.map(c => castVal(data[i][c] ?? null, types[c])));
+      }
+      DB.run('COMMIT');
+      inserted = end;
     }
-    DB.run('COMMIT');
   } catch(e) {
-    DB.run('ROLLBACK');
+    try { DB.run('ROLLBACK'); } catch(_) {}
     throw e;
   } finally {
     stmt.free();
   }
+  showProgress('Finalizing…', 97, `${total.toLocaleString()} rows inserted`);
+  await yieldToBrowser();
 }
 
 // ══════════════════════════════════════════════════════════
