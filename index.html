@@ -1,797 +1,1100 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DuckDB Oat - Resizable & Elegant</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,300;1,400;1,700&display=swap" rel="stylesheet">
-    <style>
-        /* THEME SYSTEM: Oat | Modern | Dark */
-        :root, [data-theme="oat"] {
-            --bg-primary: #FDFBF7; --bg-secondary: #F5F1EB; --bg-tertiary: #E8E2D9;
-            --border-color: #D4CFC7; --text-muted: #A8A39A; --text-secondary: #5C5852;
-            --text-primary: #3D3A36; --accent: #B8956A; --accent-hover: #9A7B56;
-            --success: #7A9E7E; --error: #C17B7B; --shadow: rgba(0,0,0,0.08);
-            --font-serif: 'Merriweather', serif; --font-sans: 'Inter', sans-serif;
-            --font-mono: 'JetBrains Mono', monospace;
-        }
-        [data-theme="modern"] {
-            --bg-primary: #FFFFFF; --bg-secondary: #F8FAFC; --bg-tertiary: #F1F5F9;
-            --border-color: #E2E8F0; --text-muted: #94A3B8; --text-secondary: #64748B;
-            --text-primary: #0F172A; --accent: #3B82F6; --accent-hover: #2563EB;
-            --success: #10B981; --error: #EF4444; --shadow: rgba(0,0,0,0.04);
-        }
-        [data-theme="dark"] {
-            --bg-primary: #0F172A; --bg-secondary: #1E293B; --bg-tertiary: #334155;
-            --border-color: #475569; --text-muted: #94A3B8; --text-secondary: #CBD5E1;
-            --text-primary: #F8FAFC; --accent: #60A5FA; --accent-hover: #3B82F6;
-            --success: #34D399; --error: #F87171; --shadow: rgba(0,0,0,0.3);
-        }
-        :root {
-            --oat-cream: var(--bg-primary); --oat-warm: var(--bg-secondary);
-            --oat-beige: var(--bg-tertiary); --oat-taupe: var(--border-color);
-            --oat-stone: var(--text-muted); --oat-charcoal: var(--text-secondary);
-            --oat-espresso: var(--text-primary); --oat-accent: var(--accent);
-            --oat-accent-hover: var(--accent-hover); --oat-success: var(--success);
-            --oat-error: var(--error);
-        }
-        * { transition: background-color 0.2s, border-color 0.2s, color 0.2s; }
-        body { font-family: var(--font-sans); background: var(--oat-cream); color: var(--oat-espresso); }
-        .font-serif { font-family: var(--font-serif); }
-        .font-mono { font-family: var(--font-mono); }
-        h1, h2, h3, .serif-heading { font-family: var(--font-serif); font-weight: 400; letter-spacing: -0.02em; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--oat-taupe); border-radius: 3px; }
-        .btn-oat { background: var(--oat-warm); border: 1px solid var(--oat-beige); color: var(--oat-charcoal); }
-        .btn-oat:hover { background: var(--oat-beige); border-color: var(--oat-taupe); color: var(--oat-espresso); }
-        .btn-primary { background: var(--oat-espresso); color: var(--oat-cream); border: 1px solid var(--oat-espresso); }
-        .btn-primary:hover { background: var(--oat-charcoal); border-color: var(--oat-charcoal); }
-        .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
-        .toast { background: var(--oat-cream); border: 1px solid var(--oat-beige); border-left: 3px solid var(--oat-accent); padding: 12px 16px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); display: flex; align-items: center; gap: 10px; min-width: 280px; transform: translateX(400px); transition: transform 0.3s cubic-bezier(0.16,1,0.3,1); }
-        .toast.show { transform: translateX(0); }
-        .toast.success { border-left-color: var(--oat-success); }
-        .toast.error { border-left-color: var(--oat-error); }
-        .suggestions { position: absolute; background: var(--oat-cream); border: 1px solid var(--oat-beige); border-radius: 6px; box-shadow: 0 8px 16px rgba(0,0,0,0.1); max-height: 280px; overflow-y: auto; z-index: 100; display: none; min-width: 240px; }
-        .suggestion-header { padding: 6px 12px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--oat-stone); background: var(--oat-warm); border-bottom: 1px solid var(--oat-beige); }
-        .suggestion-item { padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--oat-beige); }
-        .suggestion-item:last-child { border-bottom: none; }
-        .suggestion-item:hover, .suggestion-item.selected { background: var(--oat-warm); }
-        .drop-zone { border: 2px dashed var(--oat-taupe); border-radius: 8px; transition: all 0.2s; background: var(--oat-warm); }
-        .drop-zone:hover, .drop-zone.drag-over { border-color: var(--oat-accent); background: var(--oat-beige); }
-        .data-table th { font-weight: 500; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--oat-stone); background: var(--oat-warm); }
-        .data-table td { font-size: 12px; font-family: var(--font-mono); color: var(--oat-charcoal); }
-        .main-container { display: flex; flex-direction: column; height: 100%; }
-        .main-container.horizontal { flex-direction: row; }
-        .editor-section { flex: 1; min-height: 0; position: relative; }
-        .main-container.horizontal .editor-section { width: 60%; height: 100%; }
-        .resizer { height: 6px; background: var(--oat-beige); cursor: row-resize; display: flex; align-items: center; justify-content: center; transition: background 0.2s; position: relative; }
-        .resizer:hover { background: var(--oat-accent); }
-        .resizer::after { content: ''; width: 40px; height: 2px; background: var(--oat-taupe); border-radius: 1px; }
-        .main-container.horizontal .resizer { width: 6px; height: 100%; cursor: col-resize; }
-        .main-container.horizontal .resizer::after { width: 2px; height: 40px; }
-        .results-section { height: 40%; min-height: 150px; display: flex; flex-direction: column; background: var(--oat-warm); }
-        .main-container.horizontal .results-section { width: 40%; height: 100%; }
-        .layout-toggle { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: var(--oat-warm); border: 1px solid var(--oat-beige); color: var(--oat-charcoal); transition: all 0.2s; }
-        .layout-toggle:hover { background: var(--oat-beige); color: var(--oat-espresso); }
-        .help-modal { position: fixed; inset: 0; background: rgba(28,25,23,0.6); z-index: 10000; display: none; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
-        .help-modal.show { display: flex; }
-        .help-content { background: var(--oat-cream); border-radius: 12px; max-width: 700px; width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); border: 1px solid var(--oat-beige); }
-        .code-block { background: var(--oat-warm); border: 1px solid var(--oat-beige); border-radius: 6px; padding: 12px; font-family: var(--font-mono); font-size: 11px; overflow-x: auto; color: var(--oat-charcoal); margin: 8px 0; }
-        .tag { display: inline-block; padding: 2px 8px; background: var(--oat-warm); border: 1px solid var(--oat-beige); border-radius: 4px; font-size: 10px; color: var(--oat-charcoal); margin-right: 6px; margin-bottom: 6px; }
-        .theme-toggle { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: var(--oat-warm); border: 1px solid var(--oat-beige); color: var(--oat-charcoal); }
-        .theme-toggle:hover { background: var(--oat-beige); color: var(--oat-espresso); }
-        .loader { width: 16px; height: 16px; border: 2px solid var(--oat-beige); border-top-color: var(--oat-accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .compression-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; background: #FEF3C7; color: #92400E; border-radius: 4px; font-size: 9px; font-weight: 600; text-transform: uppercase; }
-        .active-table { background: var(--oat-beige) !important; border-left: 3px solid var(--oat-accent); }
-        .quick-action-btn { background: var(--oat-cream); border: 1px solid var(--oat-beige); border-radius: 9999px; font-size: 10px; font-weight: 500; color: var(--oat-charcoal); padding: 0.375rem 0.75rem; box-shadow: 0 1px 2px rgba(0,0,0,0.08); transition: background 0.2s, color 0.2s; }
-        .quick-action-btn:hover { background: var(--oat-warm); }
-        [data-theme="dark"] #resultStats { color: var(--oat-charcoal); }
-        [data-theme="dark"] .quick-action-btn { background: var(--oat-warm); color: var(--oat-espresso); }
-        [data-theme="dark"] .toast { background: var(--oat-warm); border-color: var(--oat-beige); }
-        [data-theme="dark"] .suggestions { background: var(--oat-warm); }
-        [data-theme="dark"] .help-content { background: var(--oat-warm); border-color: var(--oat-beige); }
-    </style>
-<base target="_blank">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL Studio</title>
+
+<!-- CodeMirror -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<link  rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/sql-hint.min.js"></script>
+<link  rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+
+<!-- sql.js: SQLite compiled to WASM, runs on main thread — NO Worker needed -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+
+<!-- PapaParse for robust CSV/TSV parsing -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg:#0d0f14; --bg2:#13161e; --bg3:#1a1e2a; --bg4:#222636;
+  --border:#2a2f42; --border2:#363d56;
+  --text:#e2e6f0; --text2:#8b92aa; --text3:#565d78;
+  --accent:#ffd166; --a2:#ff6b6b; --blue:#4ecdc4; --green:#06d6a0; --purple:#a78bfa;
+  --ui:'Syne',sans-serif; --mono:'JetBrains Mono',monospace; --r:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--ui);background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* TOP */
+#top{height:48px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0}
+.logo{display:flex;align-items:center;gap:8px;font-weight:800;font-size:15px;letter-spacing:-.3px;color:var(--accent);text-transform:uppercase;white-space:nowrap}
+.f1{flex:1}
+.badge{font-family:var(--mono);font-size:11px;color:var(--text3);background:var(--bg3);border:1px solid var(--border);padding:3px 8px;border-radius:4px}
+#sdot{width:7px;height:7px;border-radius:50%;background:var(--text3);transition:background .3s;flex-shrink:0}
+#sdot.ready{background:var(--green);box-shadow:0 0 6px var(--green)}
+#sdot.busy{background:var(--accent);animation:pulse 1s infinite}
+#sdot.err{background:var(--a2)}
+#slbl{font-size:12px;color:var(--text2)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* LAYOUT */
+#main{display:flex;flex:1;overflow:hidden}
+
+/* SIDEBAR */
+#sidebar{width:260px;min-width:180px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
+.stabs{display:flex;border-bottom:1px solid var(--border)}
+.stab{flex:1;padding:10px 0;text-align:center;font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+.stab:hover{color:var(--text2)}
+.stab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.spanel{display:none;flex:1;flex-direction:column;overflow:hidden}
+.spanel.on{display:flex}
+
+#dropz{margin:12px;border:1.5px dashed var(--border2);border-radius:var(--r);padding:18px 12px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg3);flex-shrink:0}
+#dropz:hover,#dropz.over{border-color:var(--accent);background:rgba(255,209,102,.05)}
+.dico{font-size:22px;margin-bottom:5px}
+.dlbl{font-size:12px;color:var(--text2)}
+.dsub{font-size:10px;color:var(--text3);margin-top:3px;font-family:var(--mono)}
+#finput{display:none}
+
+#tsrch{margin:8px;padding:6px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--mono);font-size:12px;width:calc(100% - 16px);outline:none;flex-shrink:0}
+#tsrch:focus{border-color:var(--accent)}
+#tsrch::placeholder{color:var(--text3)}
+
+#tlist{flex:1;overflow-y:auto;padding:4px 6px 8px}
+#tlist::-webkit-scrollbar{width:4px}
+#tlist::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+.ti{border-radius:var(--r);margin-bottom:4px;border:1px solid transparent;transition:border-color .15s;background:var(--bg3)}
+.ti.sel{border-color:var(--accent)}
+.th2{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;border-radius:var(--r) var(--r) 0 0;transition:background .15s}
+.th2:hover{background:var(--bg4)}
+.tn{font-size:12px;font-weight:600;color:var(--text);flex:1;font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trc{font-size:10px;color:var(--text3);font-family:var(--mono);white-space:nowrap}
+.tact{display:flex;gap:4px;padding:0 8px 8px}
+.tbtn{flex:1;padding:4px 2px;border:1px solid var(--border2);background:var(--bg2);color:var(--text2);font-size:10px;font-family:var(--ui);font-weight:600;border-radius:4px;cursor:pointer;transition:all .15s}
+.tbtn:hover{background:var(--bg4);color:var(--text);border-color:var(--accent)}
+.tbtn.d{color:var(--a2)}
+.tbtn.d:hover{border-color:var(--a2);background:rgba(255,107,107,.1)}
+.scols{padding:0 8px 8px}
+.scol{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:4px;font-family:var(--mono);font-size:11px}
+.scol:hover{background:var(--bg4)}
+.sname{color:var(--text2);flex:1}
+.stype{font-size:10px;color:var(--purple)}
+.sempty{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;color:var(--text3);font-size:12px;gap:6px;padding:20px;text-align:center}
+.sempty .ei{font-size:28px;opacity:.4}
+
+#hlist{flex:1;overflow-y:auto;padding:6px}
+.hi{padding:8px 10px;border-radius:var(--r);cursor:pointer;margin-bottom:3px;border:1px solid transparent;transition:all .15s}
+.hi:hover{background:var(--bg3);border-color:var(--border)}
+.hsql{font-family:var(--mono);font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hmeta{font-size:10px;color:var(--text3);margin-top:3px;display:flex;gap:8px}
+.ok{color:var(--green)} .er{color:var(--a2)}
+
+.slbl{padding:8px 12px 4px;font-size:10px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:var(--text3)}
+.snips{flex:1;overflow-y:auto}
+.snip{margin:4px 8px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);cursor:pointer;transition:all .15s}
+.snip:hover{border-color:var(--accent);background:rgba(255,209,102,.05)}
+.st{font-size:11px;font-weight:600;color:var(--text2)}
+.ss{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:3px}
+
+#sresz{width:4px;background:transparent;cursor:col-resize;flex-shrink:0;transition:background .15s}
+#sresz:hover{background:var(--accent)}
+
+/* CONTENT */
+#content{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+
+#qtabs{display:flex;align-items:center;background:var(--bg2);border-bottom:1px solid var(--border);padding:0 8px;gap:2px;overflow-x:auto;flex-shrink:0;height:38px}
+#qtabs::-webkit-scrollbar{display:none}
+.qtab{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:5px 5px 0 0;font-size:12px;cursor:pointer;color:var(--text3);white-space:nowrap;transition:all .15s;border:1px solid transparent;border-bottom:none;position:relative;top:1px}
+.qtab:hover{color:var(--text2);background:var(--bg3)}
+.qtab.on{color:var(--text);background:var(--bg);border-color:var(--border)}
+.qx{width:14px;height:14px;display:flex;align-items:center;justify-content:center;border-radius:3px;font-size:10px;opacity:0;transition:opacity .15s}
+.qtab:hover .qx{opacity:1}
+.qx:hover{background:rgba(255,107,107,.2);color:var(--a2)}
+#addtab{width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:5px;cursor:pointer;color:var(--text3);font-size:16px;transition:all .15s;border:1px solid transparent;margin-left:4px}
+#addtab:hover{background:var(--bg3);color:var(--accent);border-color:var(--border)}
+
+#etbar{display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
+.tlbl{font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+.btn{display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:var(--r);font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);font-family:var(--ui);transition:all .15s;white-space:nowrap}
+.btn:hover:not(:disabled){background:var(--bg4);color:var(--text)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+#runbtn{background:var(--accent);color:#0d0f14;border-color:var(--accent)}
+#runbtn:hover:not(:disabled){background:#ffdb80}
+.kb{font-family:var(--mono);font-size:9px;background:rgba(0,0,0,.2);padding:1px 4px;border-radius:3px;opacity:.7}
+#lsel{padding:4px 6px;border-radius:var(--r);background:var(--bg3);border:1px solid var(--border2);color:var(--text2);font-family:var(--mono);font-size:11px;cursor:pointer;outline:none}
+
+#edbox{height:200px;overflow:hidden;flex-shrink:0}
+.CodeMirror{height:100%!important;font-family:var(--mono)!important;font-size:13px!important;line-height:1.6!important;background:var(--bg)!important;color:var(--text)!important}
+.CodeMirror-gutters{background:var(--bg2)!important;border-right:1px solid var(--border)!important}
+.CodeMirror-linenumber{color:var(--text3)!important}
+.CodeMirror-cursor{border-left-color:var(--accent)!important}
+.CodeMirror-selected{background:rgba(255,209,102,.12)!important}
+.CodeMirror-activeline-background{background:rgba(255,255,255,.02)!important}
+.cm-keyword{color:var(--accent)!important;font-weight:600}
+.cm-builtin{color:var(--blue)!important}
+.cm-string{color:var(--green)!important}
+.cm-number{color:var(--purple)!important}
+.cm-comment{color:var(--text3)!important;font-style:italic}
+.CodeMirror-hints{background:var(--bg3)!important;border:1px solid var(--border2)!important;border-radius:var(--r)!important}
+.CodeMirror-hint{color:var(--text)!important;font-family:var(--mono)!important;font-size:12px!important}
+.CodeMirror-hint-active{background:var(--accent)!important;color:#0d0f14!important}
+
+#rhandle{height:5px;background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);cursor:ns-resize;display:flex;align-items:center;justify-content:center;flex-shrink:0;user-select:none;transition:background .15s}
+#rhandle:hover{background:var(--bg4)}
+#rhandle::before{content:'⋯';color:var(--text3);font-size:12px}
+
+#rpane{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0}
+#rtbar{display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:nowrap;min-height:40px}
+#rmeta{font-family:var(--mono);font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:1}
+.rf1{flex:1;min-width:8px}
+#rfilter{padding:5px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);color:var(--text2);font-family:var(--mono);font-size:11px;outline:none;width:200px;transition:border-color .15s;flex-shrink:0}
+#rfilter:focus{border-color:var(--accent)}
+#rfilter::placeholder{color:var(--text3)}
+#vtog{display:flex;border:1px solid var(--border2);border-radius:var(--r);overflow:hidden;flex-shrink:0}
+.vbtn{padding:4px 10px;font-size:11px;cursor:pointer;color:var(--text3);background:var(--bg3);border:none;font-family:var(--ui);font-weight:600;transition:all .15s}
+.vbtn.on{background:var(--accent);color:#0d0f14}
+.vbtn:not(.on):hover{background:var(--bg4);color:var(--text2)}
+
+#rcont{flex:1;overflow:auto;position:relative}
+#rcont::-webkit-scrollbar{width:6px;height:6px}
+#rcont::-webkit-scrollbar-track{background:var(--bg2)}
+#rcont::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+#ph{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text3);gap:10px}
+.phico{font-size:36px;opacity:.3}
+
+#loading{display:none;position:absolute;inset:0;background:rgba(13,15,20,.7);align-items:center;justify-content:center;z-index:10}
+#loading.on{display:flex}
+.spin{width:30px;height:30px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+#dtable{display:none}
+#dtable.on{display:block}
+.rt{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+.rt thead{position:sticky;top:0;z-index:5}
+.rt th{background:var(--bg3);color:var(--text2);padding:8px 12px;text-align:left;font-weight:600;font-size:11px;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
+.rt th:hover{background:var(--bg4);color:var(--text)}
+.ctype{font-size:9px;color:var(--purple);display:block;font-weight:400;margin-top:1px}
+.sarr{opacity:.3;margin-left:3px;font-size:10px;display:inline-block}
+.sasc .sarr{opacity:1} .sdsc .sarr{opacity:1;transform:scaleY(-1)}
+.rt td{padding:6px 12px;border-bottom:1px solid rgba(42,47,66,.4);color:var(--text);white-space:nowrap;max-width:320px;overflow:hidden;text-overflow:ellipsis}
+.rt tr:hover td{background:var(--bg3)}
+.vnull{color:var(--text3)!important;font-style:italic}
+.vnum{color:var(--purple)!important}
+.vbool{color:var(--blue)!important}
+.rt td:first-child,.rt th:first-child{color:var(--text3);font-size:10px;text-align:right;padding-right:14px;background:var(--bg2);position:sticky;left:0;min-width:48px;border-right:1px solid var(--border)}
+
+#pager{display:flex;align-items:center;gap:8px;padding:7px 12px;background:var(--bg2);border-top:1px solid var(--border);font-size:12px;color:var(--text3);flex-shrink:0}
+.pbtn{padding:3px 10px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);border-radius:4px;cursor:pointer;font-family:var(--ui);font-size:11px;font-weight:600;transition:all .15s}
+.pbtn:hover:not(:disabled){background:var(--bg4);color:var(--text)}
+.pbtn:disabled{opacity:.3;cursor:not-allowed}
+
+#jview{display:none;padding:12px;overflow:auto;height:100%}
+#jview.on{display:block}
+#jpre{font-family:var(--mono);font-size:12px;color:var(--text);line-height:1.6;white-space:pre-wrap;word-break:break-all}
+
+#toast{position:fixed;bottom:20px;right:20px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:10px 16px;font-size:12px;color:var(--text);z-index:9999;opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;max-width:340px}
+#toast.on{opacity:1;transform:translateY(0)}
+#toast.ok{border-color:var(--green)}
+#toast.er{border-color:var(--a2)}
+</style>
 </head>
-<body class="h-screen flex flex-col overflow-hidden">
+<body>
 
-    <!-- Loading -->
-    <div id="loadingOverlay" class="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3" style="background: var(--oat-cream);">
-        <div class="loader" style="width: 24px; height: 24px;"></div>
-        <p class="text-sm font-serif" style="color: var(--oat-stone);">Initializing DuckDB...</p>
+<div id="top">
+  <div class="logo">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <circle cx="10" cy="10" r="9" fill="#ffd166" opacity="0.15"/>
+      <ellipse cx="10" cy="10" rx="7" ry="4" stroke="#ffd166" stroke-width="1.5"/>
+      <line x1="3" y1="10" x2="17" y2="10" stroke="#ffd166" stroke-width="1.5"/>
+      <ellipse cx="10" cy="10" rx="7" ry="4" stroke="#ffd166" stroke-width="1.5" transform="rotate(60 10 10)"/>
+    </svg>
+    SQL Studio
+  </div>
+  <div class="f1"></div>
+  <div class="badge" id="ver">loading…</div>
+  <div id="sdot" class="busy"></div>
+  <span id="slbl">Initializing…</span>
+</div>
+
+<div id="main">
+  <div id="sidebar">
+    <div class="stabs">
+      <div class="stab on" data-p="tp">Tables</div>
+      <div class="stab"    data-p="hp">History</div>
+      <div class="stab"    data-p="snp">Snippets</div>
     </div>
 
-    <!-- Toasts -->
-    <div id="toastContainer" class="toast-container"></div>
-
-    <!-- Help Modal -->
-    <div id="helpModal" class="help-modal" onclick="if(event.target===this) closeHelp()">
-        <div class="help-content">
-            <div class="p-5 border-b flex justify-between items-center" style="background: var(--oat-warm); border-color: var(--oat-beige);">
-                <div>
-                    <h2 class="text-xl font-serif" style="color: var(--oat-espresso);">DuckDB Guide</h2>
-                    <p class="text-xs mt-0.5" style="color: var(--oat-stone);">Elegant data exploration</p>
-                </div>
-                <button onclick="closeHelp()" class="w-8 h-8 flex items-center justify-center rounded-lg transition-colors" style="color: var(--oat-stone); background: var(--oat-cream);"><i class="fas fa-times"></i></button>
-            </div>
-            <div>
-                <div class="p-5 border-b" style="border-color: var(--oat-beige);">
-                    <h3 class="text-sm font-serif mb-3 flex items-center gap-2" style="color: var(--oat-espresso);"><i class="fas fa-rocket" style="color: var(--oat-accent);"></i> Quick Start</h3>
-                    <div class="grid grid-cols-2 gap-3 text-xs" style="color: var(--oat-charcoal);">
-                        <div class="flex items-start gap-2"><span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] shrink-0 mt-0.5 text-white" style="background: var(--oat-accent);">1</span><span><strong>Import:</strong> Drop CSV, CSV.GZ, JSON, Parquet files</span></div>
-                        <div class="flex items-start gap-2"><span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] shrink-0 mt-0.5 text-white" style="background: var(--oat-accent);">2</span><span><strong>Autocomplete:</strong> Type for suggestions, Tab to accept</span></div>
-                        <div class="flex items-start gap-2"><span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] shrink-0 mt-0.5 text-white" style="background: var(--oat-accent);">3</span><span><strong>Layout:</strong> Toggle horizontal/vertical split</span></div>
-                        <div class="flex items-start gap-2"><span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] shrink-0 mt-0.5 text-white" style="background: var(--oat-accent);">4</span><span><strong>Resize:</strong> Drag divider to adjust panels</span></div>
-                    </div>
-                </div>
-                <div class="p-5 border-b" style="border-color: var(--oat-beige);">
-                    <h3 class="text-sm font-serif mb-3 flex items-center gap-2" style="color: var(--oat-espresso);"><i class="fas fa-file-import" style="color: var(--oat-accent);"></i> Supported Files</h3>
-                    <div class="flex flex-wrap">
-                        <span class="tag"><i class="fas fa-file-csv mr-1" style="color: var(--oat-success);"></i>CSV</span>
-                        <span class="tag"><i class="fas fa-compress-alt mr-1" style="color:#92400E;"></i>CSV.GZ</span>
-                        <span class="tag"><i class="fas fa-file-code mr-1" style="color:#60A5FA;"></i>JSON</span>
-                        <span class="tag"><i class="fas fa-file-archive mr-1" style="color:#FBBF24;"></i>Parquet</span>
-                        <span class="tag"><i class="fas fa-file-excel mr-1" style="color:#34D399;"></i>Excel</span>
-                    </div>
-                </div>
-                <div class="p-5 border-b" style="border-color: var(--oat-beige);">
-                    <h3 class="text-sm font-serif mb-3 flex items-center gap-2" style="color: var(--oat-espresso);"><i class="fas fa-code" style="color: var(--oat-accent);"></i> Essential Queries</h3>
-                    <div class="space-y-2">
-                        <div class="code-block">SELECT * FROM table_name LIMIT 100;</div>
-                        <div class="code-block">SELECT COUNT(*), AVG(price) FROM sales GROUP BY category;</div>
-                    </div>
-                </div>
-                <div class="p-5" style="background: var(--oat-warm);">
-                    <h3 class="text-sm font-serif mb-3 flex items-center gap-2" style="color: var(--oat-espresso);"><i class="fas fa-lightbulb" style="color: var(--oat-accent);"></i> Pro Tips</h3>
-                    <ul class="text-xs space-y-2 list-disc list-inside" style="color: var(--oat-charcoal);">
-                        <li>Click a table to select it, then use Preview/Count/Stats buttons</li>
-                        <li>Drag the resize handle to adjust panel sizes</li>
-                        <li>Toggle layout button to switch between horizontal and vertical</li>
-                    </ul>
-                </div>
-            </div>
-            <div class="p-4 border-t" style="background: var(--oat-warm); border-color: var(--oat-beige);">
-                <button onclick="closeHelp()" class="w-full py-2.5 rounded-lg text-sm font-medium text-white transition-colors" style="background: var(--oat-accent);">Start Exploring</button>
-            </div>
+    <!-- TABLES PANEL -->
+    <div class="spanel on" id="tp">
+      <div id="dropz">
+        <div class="dico">📂</div>
+        <div class="dlbl">Drop files or click to import</div>
+        <div class="dsub">CSV · CSV.GZ · TSV · JSON</div>
+        <input type="file" id="finput" multiple accept=".csv,.tsv,.json,.gz,.csv.gz">
+      </div>
+      <input type="text" id="tsrch" placeholder="Filter tables…">
+      <div id="tlist">
+        <div class="sempty" id="noTbl">
+          <span class="ei">🦆</span>
+          <span>No tables yet.</span>
+          <span>Import a file to start.</span>
         </div>
+      </div>
     </div>
 
-    <!-- Header -->
-    <header class="h-14 border-b flex items-center justify-between px-4 shrink-0" style="background: var(--oat-cream); border-color: var(--oat-beige);">
-        <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-md flex items-center justify-center" style="background: var(--oat-accent);"><i class="fas fa-database text-white text-xs"></i></div>
-            <div><h1 class="font-serif text-lg tracking-tight" style="color: var(--oat-espresso);">DuckDB</h1></div>
-        </div>
-        <div class="flex items-center gap-2">
-            <button onclick="toggleTheme()" class="theme-toggle" title="Toggle theme"><i class="fas fa-moon text-xs" id="themeIcon"></i></button>
-            <button onclick="toggleLayout()" class="layout-toggle" title="Toggle layout"><i class="fas fa-columns text-xs" id="layoutIcon"></i></button>
-            <button onclick="openHelp()" class="btn-oat px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2"><i class="fas fa-book-open" style="color: var(--oat-stone);"></i><span>Guide</span></button>
-            <input type="file" id="fileInput" class="hidden" accept=".csv,.csv.gz,.tsv,.txt,.parquet,.json,.jsonl,.ndjson,.xlsx,.xls,.gz,.bz2" multiple>
-            <button onclick="document.getElementById('fileInput').click()" class="btn-oat px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2"><i class="fas fa-plus" style="color: var(--oat-stone);"></i><span>Import</span></button>
-            <button onclick="executeQuery()" class="btn-primary px-4 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2"><i class="fas fa-play text-[10px]"></i><span>Run</span></button>
-        </div>
-    </header>
-
-    <div class="flex-1 flex overflow-hidden">
-        <!-- Sidebar -->
-        <aside class="w-64 border-r flex flex-col shrink-0" style="background: var(--oat-cream); border-color: var(--oat-beige);">
-            <div class="p-3 border-b" style="border-color: var(--oat-beige);">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs font-serif font-semibold uppercase tracking-wider" style="color: var(--oat-stone);">Tables</span>
-                    <button onclick="refreshTables()" class="p-1 rounded transition-colors" style="color: var(--oat-stone);"><i class="fas fa-sync-alt text-xs"></i></button>
-                </div>
-                <input type="text" id="tableSearch" placeholder="Search tables..."
-                    class="w-full rounded-md px-3 py-1.5 text-xs focus:outline-none transition-all font-serif"
-                    style="background: var(--oat-warm); border: 1px solid var(--oat-beige); color: var(--oat-espresso);"
-                    oninput="filterTables(this.value)">
-            </div>
-            <div id="dropZone" class="drop-zone mx-3 mt-3 p-3 text-center cursor-pointer" onclick="document.getElementById('fileInput').click()">
-                <i class="fas fa-cloud-upload-alt mb-1 text-lg" style="color: var(--oat-stone);"></i>
-                <p class="text-[10px] font-medium" style="color: var(--oat-charcoal);">Drop files here</p>
-                <p class="text-[9px] mt-0.5" style="color: var(--oat-stone);">CSV.GZ supported</p>
-            </div>
-            <div id="tableList" class="flex-1 overflow-y-auto p-2 space-y-1">
-                <div class="text-xs text-center py-8 italic font-serif" style="color: var(--oat-stone);">No data loaded</div>
-            </div>
-        </aside>
-
-        <!-- Main with resizable panels -->
-        <main class="flex-1 flex flex-col min-w-0 main-container" id="mainContainer" style="background: var(--oat-cream);">
-            <!-- Editor Section -->
-            <div class="editor-section flex flex-col" id="editorSection">
-                <div class="px-3 py-2 border-b flex justify-between items-center" style="background: var(--oat-warm); border-color: var(--oat-beige);">
-                    <div class="flex items-center gap-3"><span class="text-xs font-serif font-medium uppercase tracking-wider" style="color: var(--oat-stone);">Editor</span>
-                        <div class="flex items-center gap-2 text-[10px]" style="color: var(--oat-stone);">
-                            <span class="px-1.5 py-0.5 rounded font-mono" style="background: var(--oat-cream); border: 1px solid var(--oat-beige);">Tab</span>
-                            <span>to complete</span>
-                            <span class="px-1.5 py-0.5 rounded font-mono ml-2" style="background: var(--oat-cream); border: 1px solid var(--oat-beige);">Ctrl+Enter</span>
-                            <span>to run</span>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <button onclick="formatSQL()" class="text-[10px] px-2 py-1 rounded transition-colors" style="color: var(--oat-stone);">Format</button>
-                        <button onclick="clearEditor()" class="text-[10px] px-2 py-1 rounded transition-colors" style="color: var(--oat-stone);">Clear</button>
-                    </div>
-                </div>
-
-                <div class="relative flex-1">
-                    <textarea id="sqlEditor" class="w-full h-full p-4 resize-none focus:outline-none font-mono text-sm"
-                        spellcheck="false"
-                        placeholder="-- Write SQL here
--- Select a table from sidebar, then use Preview/Count/Stats
--- Or write your own query and press Ctrl+Enter"
-                        style="background: var(--oat-cream); color: var(--oat-espresso);"></textarea>
-                    <div id="inlineSuggestions" class="suggestions"></div>
-                </div>
-
-                <!-- Quick Actions -->
-                <div id="quickActions" class="absolute bottom-4 left-4 flex gap-2 opacity-0 transition-opacity duration-300 pointer-events-none">
-                    <button class="quick-action-btn" onclick="previewTable()"><i class="fas fa-eye mr-1"></i> Preview</button>
-                    <button class="quick-action-btn" onclick="countTable()"><i class="fas fa-calculator mr-1"></i> Count</button>
-                    <button class="quick-action-btn" onclick="statsTable()"><i class="fas fa-chart-bar mr-1"></i> Stats</button>
-                </div>
-            </div>
-
-            <!-- Resizer -->
-            <div class="resizer" id="resizer" title="Drag to resize"></div>
-
-            <!-- Results Section -->
-            <div class="results-section" id="resultsSection">
-                <div class="px-3 py-2 border-b flex justify-between items-center" style="background: var(--oat-cream); border-color: var(--oat-beige);">
-                    <div class="flex items-center gap-3"><span class="text-xs font-serif font-medium uppercase tracking-wider" style="color: var(--oat-stone);">Results</span>
-                        <span id="resultStats" class="text-[10px] hidden font-mono" style="color: var(--oat-stone);"></span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <button onclick="copyResults()" class="text-[10px] px-2 py-1 rounded transition-colors flex items-center gap-1" style="color: var(--oat-charcoal);"><i class="fas fa-copy text-[10px]"></i> Copy</button>
-                        <button onclick="exportCSV()" class="text-[10px] px-2 py-1 rounded transition-colors flex items-center gap-1" style="color: var(--oat-charcoal);"><i class="fas fa-file-csv text-[10px]"></i> CSV</button>
-                    </div>
-                </div>
-
-                <div id="resultsContainer" class="flex-1 overflow-auto relative" style="background: var(--oat-cream);">
-                    <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center" style="color: var(--oat-stone);">
-                        <i class="fas fa-table text-3xl mb-2 opacity-20"></i>
-                        <p class="text-xs font-serif">Run a query or select a table</p>
-                        <p class="text-[10px] mt-1 opacity-60 font-serif">Click a table to enable quick actions</p>
-                    </div>
-                    <div id="loadingState" class="absolute inset-0 flex items-center justify-center hidden" style="background: var(--oat-cream);"><div class="loader"></div></div>
-                    <table id="resultsTable" class="w-full data-table hidden"><thead class="sticky top-0"></thead><tbody class="divide-y" style="border-color: var(--oat-beige);"></tbody></table>
-                    <div id="errorState" class="absolute inset-0 flex items-center justify-center hidden p-6">
-                        <div class="rounded-lg p-4 max-w-md" style="background: var(--oat-warm); border: 1px solid var(--oat-error);">
-                            <p class="text-xs font-serif font-semibold mb-1" style="color: var(--oat-error);">Error</p>
-                            <p id="errorText" class="text-xs font-mono" style="color: var(--oat-charcoal);"></p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </main>
+    <!-- HISTORY PANEL -->
+    <div class="spanel" id="hp">
+      <div class="slbl">Query History</div>
+      <div id="hlist">
+        <div class="sempty"><span class="ei">📋</span><span>No history yet.</span></div>
+      </div>
     </div>
 
-    <script type="module">
-        let db = null, conn = null, currentResults = null, tables = [];
-        let columns = {};
-        let selectedTable = null; // currently selected table
-        let isHorizontal = false; // layout state
-        let splitRatio = 0.6; // default 60% editor, 40% results
+    <!-- SNIPPETS PANEL -->
+    <div class="spanel" id="snp">
+      <div class="slbl">SQL Snippets</div>
+      <div class="snips">
+        <div class="snip" data-sql="SELECT sqlite_version();"><div class="st">SQLite Version</div><div class="ss">SELECT sqlite_version();</div></div>
+        <div class="snip" data-sql="SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;"><div class="st">List All Tables</div><div class="ss">sqlite_master</div></div>
+        <div class="snip" data-sql="PRAGMA table_info('TABLE');"><div class="st">Table Schema</div><div class="ss">PRAGMA table_info</div></div>
+        <div class="snip" data-sql="SELECT COUNT(*) as total_rows FROM TABLE;"><div class="st">Row Count</div><div class="ss">COUNT(*)</div></div>
+        <div class="snip" data-sql="SELECT * FROM TABLE LIMIT 100;"><div class="st">Preview Table</div><div class="ss">SELECT * LIMIT 100</div></div>
+        <div class="snip" data-sql="SELECT col, COUNT(*) as n\nFROM TABLE\nGROUP BY col\nORDER BY n DESC\nLIMIT 20;"><div class="st">Value Counts</div><div class="ss">GROUP BY … ORDER BY n DESC</div></div>
+        <div class="snip" data-sql="SELECT\n  MIN(col) as min_val,\n  MAX(col) as max_val,\n  ROUND(AVG(col),2) as avg_val,\n  SUM(col) as total\nFROM TABLE;"><div class="st">Numeric Summary</div><div class="ss">MIN / MAX / AVG / SUM</div></div>
+        <div class="snip" data-sql="SELECT\n  COUNT(*) as total,\n  COUNT(DISTINCT col) as unique_vals,\n  SUM(CASE WHEN col IS NULL THEN 1 ELSE 0 END) as nulls\nFROM TABLE;"><div class="st">Column Stats</div><div class="ss">COUNT / DISTINCT / NULLs</div></div>
+        <div class="snip" data-sql="SELECT * FROM TABLE ORDER BY RANDOM() LIMIT 10;"><div class="st">Random Sample</div><div class="ss">ORDER BY RANDOM()</div></div>
+        <div class="snip" data-sql="SELECT a.*, b.col\nFROM TABLE a\nJOIN other_table b ON a.id = b.id;"><div class="st">JOIN Tables</div><div class="ss">JOIN … ON</div></div>
+        <div class="snip" data-sql="WITH cte AS (\n  SELECT *, ROW_NUMBER() OVER (PARTITION BY col ORDER BY col2 DESC) as rn\n  FROM TABLE\n)\nSELECT * FROM cte WHERE rn = 1;"><div class="st">Window: Top per Group</div><div class="ss">ROW_NUMBER() OVER PARTITION</div></div>
+      </div>
+    </div>
+  </div>
 
-        // ---------- THEME SYSTEM ----------
-        const themes=['oat','modern','dark'], icons={oat:'fa-coffee',modern:'fa-sun',dark:'fa-moon'}, labels={oat:'Oat',modern:'Modern',dark:'Dark'};
-        function initTheme(){let s=localStorage.getItem('theme')||'oat';if(!themes.includes(s))s='oat';setTheme(s);}
-        function setTheme(n){document.documentElement.setAttribute('data-theme',n);localStorage.setItem('theme',n);let i=document.getElementById('themeIcon');if(i)i.className=`fas ${icons[n]} text-xs`;}
-        function toggleTheme(){let c=document.documentElement.getAttribute('data-theme')||'oat',n=themes[(themes.indexOf(c)+1)%themes.length];setTheme(n);showToast(`${labels[n]} Theme`,'success',1500);}
-        initTheme();window.toggleTheme=toggleTheme;
+  <div id="sresz"></div>
 
-        // ---------- LAYOUT ----------
-        function applySplit() {
-            if (isHorizontal) {
-                // horizontal: editor width, results width
-                editorSection.style.width = `${splitRatio * 100}%`;
-                resultsSection.style.width = `${(1 - splitRatio) * 100}%`;
-                // clear height styles that belong to vertical mode
-                editorSection.style.height = '';
-                resultsSection.style.height = '';
-            } else {
-                // vertical: editor height, results height
-                editorSection.style.height = `${splitRatio * 100}%`;
-                resultsSection.style.height = `${(1 - splitRatio) * 100}%`;
-                // clear width styles that belong to horizontal mode
-                editorSection.style.width = '';
-                resultsSection.style.width = '';
-            }
-        }
+  <div id="content">
+    <div id="qtabs">
+      <div class="qtab on" data-tab="0"><span>Query 1</span><span class="qx">×</span></div>
+      <div id="addtab" title="New tab">+</div>
+    </div>
 
-        function toggleLayout() {
-            const container = document.getElementById('mainContainer');
-            isHorizontal = !isHorizontal;
-            if (isHorizontal) {
-                container.classList.add('horizontal');
-                document.getElementById('layoutIcon').className = 'fas fa-columns text-xs fa-rotate-90';
-            } else {
-                container.classList.remove('horizontal');
-                document.getElementById('layoutIcon').className = 'fas fa-columns text-xs';
-            }
-            // after changing orientation, re‑apply the stored split ratio
-            applySplit();
-            localStorage.setItem('layout', isHorizontal ? 'horizontal' : 'vertical');
-        }
-        const savedLayout = localStorage.getItem('layout');
-        if (savedLayout === 'horizontal') toggleLayout(); // will also call applySplit()
-        window.toggleLayout = toggleLayout;
+    <div id="etbar">
+      <span class="tlbl">SQL Editor</span>
+      <div class="f1"></div>
+      <select id="lsel">
+        <option value="100">Limit 100</option>
+        <option value="500">Limit 500</option>
+        <option value="1000">Limit 1000</option>
+        <option value="5000">Limit 5000</option>
+        <option value="">No limit</option>
+      </select>
+      <button class="btn" id="fmtbtn">⌥ Format</button>
+      <button class="btn" id="clrbtn">Clear</button>
+      <button class="btn" id="runbtn" disabled>▶ Run <span class="kb">Ctrl+↵</span></button>
+    </div>
+    <div id="edbox"></div>
 
-        // ---------- RESIZING ----------
-        let isResizing = false;
-        const resizer = document.getElementById('resizer');
-        const editorSection = document.getElementById('editorSection');
-        const resultsSection = document.getElementById('resultsSection');
+    <div id="rhandle"></div>
 
-        resizer.addEventListener('mousedown', () => {
-            isResizing = true;
-            document.body.style.cursor = isHorizontal ? 'col-resize' : 'row-resize';
-            document.body.style.userSelect = 'none';
-        });
-        document.addEventListener('mousemove', e => {
-            if (!isResizing) return;
-            const container = document.getElementById('mainContainer');
-            const rect = container.getBoundingClientRect();
+    <div id="rpane">
+      <div id="rtbar">
+        <span id="rmeta">No results</span>
+        <div class="rf1"></div>
+        <input type="text" id="rfilter" placeholder="Filter… (>=100, MCX, >0)" style="display:none" title="Supports: text search, >=100, <=50, >0, <1000, =MCX, !=0">
+        <div id="vtog" style="display:none">
+          <button class="vbtn on" data-v="table">Table</button>
+          <button class="vbtn"    data-v="json">JSON</button>
+        </div>
+        <button class="btn" id="csvbtn" style="display:none">⬇ CSV</button>
+        <button class="btn" id="cpybtn" style="display:none">Copy</button>
+      </div>
+      <div id="rcont">
+        <div id="loading"><div class="spin"></div></div>
+        <div id="ph">
+          <div class="phico">🦆</div>
+          <div style="font-size:13px">Ready to query</div>
+          <div style="font-size:11px;font-family:var(--mono)">Write SQL above · Ctrl+Enter to run</div>
+        </div>
+        <div id="dtable"></div>
+        <div id="jview"><pre id="jpre"></pre></div>
+      </div>
+      <div id="pager" style="display:none">
+        <button class="pbtn" id="pprev">← Prev</button>
+        <span id="pinfo"></span>
+        <div style="flex:1"></div>
+        <span id="pcount"></span>
+        <button class="pbtn" id="pnext">Next →</button>
+      </div>
+    </div>
+  </div>
+</div>
 
-            if (isHorizontal) {
-                const percent = ((e.clientX - rect.left) / rect.width);
-                splitRatio = Math.min(Math.max(percent, 0.1), 0.9);
-                editorSection.style.width = `${splitRatio * 100}%`;
-                resultsSection.style.width = `${(1 - splitRatio) * 100}%`;
-            } else {
-                const percent = ((e.clientY - rect.top) / rect.height);
-                splitRatio = Math.min(Math.max(percent, 0.1), 0.9);
-                editorSection.style.height = `${splitRatio * 100}%`;
-                resultsSection.style.height = `${(1 - splitRatio) * 100}%`;
-            }
-        });
-        document.addEventListener('mouseup', () => {
-            isResizing = false;
-            document.body.style.cursor = '';
-            document.body.style.userSelect = '';
-        });
+<div id="toast"></div>
 
-        // ---------- COMPLETIONS ----------
-        const completions = {
-            keywords: [
-                { name: 'SELECT', type: 'keyword', desc: 'Retrieve data' },
-                { name: 'FROM', type: 'keyword', desc: 'Specify table' },
-                { name: 'WHERE', type: 'keyword', desc: 'Filter rows' },
-                { name: 'GROUP BY', type: 'keyword', desc: 'Aggregate' },
-                { name: 'ORDER BY', type: 'keyword', desc: 'Sort' },
-                { name: 'LIMIT', type: 'keyword', desc: 'Limit rows' },
-                { name: 'JOIN', type: 'keyword', desc: 'Combine tables' },
-                { name: 'LEFT JOIN', type: 'keyword', desc: 'Keep all left' },
-                { name: 'ON', type: 'keyword', desc: 'Join condition' },
-                { name: 'AND', type: 'keyword', desc: 'Logical AND' },
-                { name: 'OR', type: 'keyword', desc: 'Logical OR' },
-                { name: 'WITH', type: 'keyword', desc: 'CTE' },
-            ],
-            functions: [
-                { name: 'COUNT(*)', type: 'function', desc: 'Count rows' },
-                { name: 'SUM(', type: 'function', desc: 'Sum values' },
-                { name: 'AVG(', type: 'function', desc: 'Average' },
-                { name: 'MIN(', type: 'function', desc: 'Minimum' },
-                { name: 'MAX(', type: 'function', desc: 'Maximum' },
-                { name: 'ROUND(', type: 'function', desc: 'Round number' },
-                { name: 'COALESCE(', type: 'function', desc: 'First non‑null' },
-                { name: 'CAST(', type: 'function', desc: 'Type cast' },
-                { name: 'ROW_NUMBER()', type: 'function', desc: 'Row number' },
-                { name: 'RANK()', type: 'function', desc: 'Rank' },
-                { name: 'LAG(', type: 'function', desc: 'Previous row' },
-                { name: 'LEAD(', type: 'function', desc: 'Next row' },
-            ],
-            files: [
-                { name: "read_csv_auto('", type: 'file', desc: 'Auto‑detect CSV' },
-                { name: "read_parquet('", type: 'file', desc: 'Read Parquet' },
-                { name: "read_json_auto('", type: 'file', desc: 'Auto‑detect JSON' },
-            ]
-        };
+<script>
+// ══════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════
+let DB      = null;
+let tables  = {};          // name -> {rowCount, columns:[{name,type}]}
+let hist    = [];
+let res     = null;        // {cols, rows, filtered}
+let pg      = 0;
+const PAGE  = 200;
+let sCol    = -1, sDir = 1;
+let actTab  = 0, tabN = 1;
+let editors = {};          // tabId -> CodeMirror
 
-        // ---------- INITIALISE DUCKDB ----------
-        (async () => {
-            try {
-                const duckdb = await import('https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/+esm');
-                const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
-                const worker = new Worker(URL.createObjectURL(new Blob([`importScripts("${bundle.mainWorker}");`], { type: 'text/javascript' })));
-                db = new duckdb.AsyncDuckDB(new duckdb.ConsoleLogger(), worker);
-                await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
-                conn = await db.connect();
+// ══════════════════════════════════════════════════════════
+// INIT  —  sql.js runs on main thread, no Worker at all
+// ══════════════════════════════════════════════════════════
+async function init() {
+  try {
+    const SQL = await initSqlJs({
+      locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${f}`
+    });
+    DB = new SQL.Database();
+    setStatus('ready','Ready');
+    document.getElementById('ver').textContent = 'SQLite (sql.js v1.10)';
+    document.getElementById('runbtn').disabled = false;
+    refreshSidebar();
+    toast('Engine ready — drop a file to import ✓','ok');
+  } catch(e) {
+    setStatus('err','Init failed');
+    toast('Init error: '+e.message,'er');
+    console.error(e);
+  }
+}
 
-                // optional extensions
-                ['parquet', 'json'].forEach(ext => conn.query(`INSTALL ${ext}; LOAD ${ext};`).catch(()=>{}));
+function setStatus(t,l){ document.getElementById('sdot').className=t; document.getElementById('slbl').textContent=l; }
 
-                document.getElementById('loadingOverlay').style.display = 'none';
-                showToast('Ready! Import a file to begin', 'success', 4000);
-                if (!localStorage.getItem('duckdb_visited')) {
-                    setTimeout(openHelp, 500);
-                    localStorage.setItem('duckdb_visited', 'true');
-                }
-            } catch (e) {
-                document.getElementById('loadingOverlay').innerHTML = `
-                    <div class="text-center p-4" style="color: var(--oat-error);">
-                        <p class="font-serif font-semibold mb-2">Failed to load DuckDB</p>
-                        <p class="text-xs" style="color: var(--oat-stone);">${e.message}</p>
-                        <button onclick="location.reload()" class="mt-4 px-4 py-2 rounded text-xs text-white" style="background: var(--oat-accent);">Retry</button>
-                    </div>`;
-            }
-        })();
+// ══════════════════════════════════════════════════════════
+// TYPE INFERENCE  ← Fixes "everything is Utf8 / Text"
+//   Samples up to 300 values per column, votes on best type
+// ══════════════════════════════════════════════════════════
+function inferColType(values) {
+  const samp = values.filter(v => v!=null && String(v).trim()!=='').slice(0,300);
+  if (!samp.length) return 'TEXT';
+  let ints=0, reals=0, bools=0, dates=0;
+  const rInt  = /^-?\d{1,15}$/;
+  const rReal = /^-?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+  const rBool = /^(true|false|yes|no|1|0)$/i;
+  const rDate = /^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?)?Z?$/;
+  for (const v of samp) {
+    const s = String(v).trim().replace(/,/g,''); // strip thousands commas
+    if (rBool.test(s))       bools++;
+    else if (rDate.test(s))  dates++;
+    else if (rInt.test(s))   ints++;
+    else if (rReal.test(s))  reals++;
+  }
+  const n = samp.length;
+  if (ints/n  >= 0.85) return 'INTEGER';
+  if ((ints+reals)/n >= 0.85) return 'REAL';
+  if (bools/n >= 0.85) return 'INTEGER'; // store as 0/1
+  if (dates/n >= 0.80) return 'TEXT';    // store as text, preserve format
+  return 'TEXT';
+}
 
-        // ---------- TOAST ----------
-        function showToast(msg, type='info', dur=3000) {
-            const c = document.getElementById('toastContainer');
-            const t = document.createElement('div');
-            t.className = `toast ${type}`;
-            const ic = {success:'check-circle',error:'exclamation-circle',info:'info-circle'}[type]||'info-circle';
-            t.innerHTML = `<i class="fas fa-${ic}" style="color: var(--oat-accent);"></i>
-                <span class="flex-1 text-sm font-serif" style="color: var(--oat-espresso);">${msg}</span>
-                <button onclick="this.parentElement.remove()" class="text-[10px]" style="color: var(--oat-stone);"><i class="fas fa-times"></i></button>`;
-            c.appendChild(t);
-            requestAnimationFrame(()=>t.classList.add('show'));
-            setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.remove(),300); }, dur);
-        }
+// Cast a raw CSV string to the right JS value for sql.js
+function castVal(v, type) {
+  if (v===null||v===undefined||String(v).trim()==='') return null;
+  const s = String(v).trim();
+  if (type==='INTEGER') {
+    // Handle comma-formatted numbers like "1,000"
+    const cleaned = s.replace(/,/g,'');
+    const n = parseInt(cleaned, 10);
+    return isNaN(n) ? null : n;
+  }
+  if (type==='REAL') {
+    const cleaned = s.replace(/,/g,'');
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? null : n;
+  }
+  return s;
+}
 
-        // ---------- FILE IMPORT ----------
-        window.handleFileSelect = async function(e) {
-            const files = Array.from(e.target.files || e.dataTransfer?.files || []);
-            if (!files.length || !conn) return;
-            for (const file of files) {
-                try {
-                    const fileName = file.name;
-                    const ext = fileName.split('.').pop().toLowerCase();
-                    const isGz = ext === 'gz';
-                    let baseName = fileName;
-                    let baseExt = ext;
-                    if (isGz) { baseName = fileName.replace(/\.gz$/i,''); baseExt = baseName.split('.').pop().toLowerCase(); }
+// ══════════════════════════════════════════════════════════
+// FILE IMPORT
+// ══════════════════════════════════════════════════════════
+const dz = document.getElementById('dropz');
+const fi = document.getElementById('finput');
+dz.addEventListener('click', ()=> fi.click());
+fi.addEventListener('change', e=>{ importFiles([...e.target.files]); fi.value=''; });
+dz.addEventListener('dragover',  e=>{ e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', ()=> dz.classList.remove('over'));
+dz.addEventListener('drop', e=>{ e.preventDefault(); dz.classList.remove('over'); importFiles([...e.dataTransfer.files]); });
 
-                    const tableName = baseName.replace(/[^a-zA-Z0-9_]/g,'_').substring(0,50);
-                    let arrayBuffer = await file.arrayBuffer();
-                    let finalFileName = fileName;
-                    let fileLabel = ext.toUpperCase();
+async function importFiles(files) {
+  for (const f of files) await importOne(f);
+  // Single sidebar refresh after ALL files are loaded
+  refreshSidebar();
+  setStatus('ready','Ready');
+}
 
-                    // For large files (>50MB), warn about decompression
-                    if (isGz && file.size > 50 * 1024 * 1024) {
-                        showToast(`Large file: decompressing ${(file.size/1024/1024).toFixed(1)}MB...`, 'info', 5000);
-                    }
+// Decompress a gzip ArrayBuffer using the native DecompressionStream API
+async function gunzip(arrayBuffer) {
+  const ds = new DecompressionStream('gzip');
+  const writer = ds.writable.getWriter();
+  writer.write(new Uint8Array(arrayBuffer));
+  writer.close();
+  const chunks = [];
+  const reader = ds.readable.getReader();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+  }
+  const total = chunks.reduce((n, c) => n + c.length, 0);
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const c of chunks) { out.set(c, off); off += c.length; }
+  return new TextDecoder().decode(out);
+}
 
-                    if (isGz) {
-                        // Check file size - browser memory limits
-                        const MAX_GZ_SIZE = 200 * 1024 * 1024; // 200MB compressed
-                        if (file.size > MAX_GZ_SIZE) {
-                            showToast(`File too large: ${(file.size/1024/1024).toFixed(0)}MB. Max: 200MB for CSV.GZ. Please decompress first.`, 'error', 8000);
-                            continue;
-                        }
-                        try {
-                            const decompressed = pako.ungzip(new Uint8Array(arrayBuffer));
-                            arrayBuffer = decompressed.buffer;
-                            finalFileName = baseName;
-                            fileLabel = `${baseExt.toUpperCase()}.GZ`;
-                        } catch (err) {
-                            showToast(`Failed to unzip ${fileName}: ${err.message}`, 'error', 5000);
-                            continue;
-                        }
-                    }
+async function importOne(file) {
+  if (!DB) { toast('DB not ready','er'); return; }
+  const fname = file.name.toLowerCase();
+  const isGz  = fname.endsWith('.gz');
+  // Strip extensions to make a clean table name
+  const base  = file.name
+    .replace(/\.gz$/i,'').replace(/\.[^.]+$/,'')
+    .replace(/[^a-zA-Z0-9_]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'') || 'table';
 
-                    await db.registerFileBuffer(finalFileName, new Uint8Array(arrayBuffer));
+  // Guarantee unique table name
+  let tname = base, n = 2;
+  const existing = DB.exec("SELECT name FROM sqlite_master WHERE type='table'");
+  const taken = new Set(existing.length ? existing[0].values.map(r=>r[0]) : []);
+  while (taken.has(tname)) tname = base+'_'+n++;
 
-                    let sql = '';
-                    if (['csv','tsv','txt'].includes(baseExt)) sql = `CREATE OR REPLACE TABLE ${tableName} AS SELECT * FROM read_csv_auto('${finalFileName}', header=true)`;
-                    else if (baseExt === 'parquet') sql = `CREATE OR REPLACE TABLE ${tableName} AS SELECT * FROM read_parquet('${finalFileName}')`;
-                    else if (['json','jsonl','ndjson'].includes(baseExt)) sql = `CREATE OR REPLACE TABLE ${tableName} AS SELECT * FROM read_json_auto('${finalFileName}')`;
-                    else throw new Error(`Unsupported: ${baseExt}`);
+  toast(`Importing ${file.name}…`);
+  setStatus('busy','Importing…');
+  try {
+    let text;
+    if (isGz) {
+      // Decompress gzip in-browser using DecompressionStream
+      const buf = await file.arrayBuffer();
+      text = await gunzip(buf);
+    } else {
+      text = await file.text();
+    }
 
-                    await conn.query(sql);
-                    const count = (await conn.query(`SELECT COUNT(*) AS c FROM ${tableName}`)).toArray()[0].c;
-                    const schema = await conn.query(`DESCRIBE ${tableName}`);
-                    columns[tableName] = schema.toArray().map(r=>r.column_name);
+    // Determine inner file type (csv.gz → csv, tsv.gz → tsv, json.gz → json)
+    const inner = fname.replace(/\.gz$/,'');
+    const ext   = inner.split('.').pop();
 
-                    // auto‑select the newly imported table
-                    selectTable(tableName);
+    if (ext==='json')    await importJSON(text, tname);
+    else if (ext==='tsv') await importCSV(text, tname, '\t');
+    else                  await importCSV(text, tname, ',');
 
-                    const badge = isGz ? '<span class="compression-badge">GZ→CSV</span>' : '';
-                    showToast(`${fileLabel}: ${fileName} loaded ${badge} (${count.toLocaleString()} rows)`, 'success', 4000);
-                    refreshTables();
-                } catch (err) {
-                    console.error(err);
-                    showToast(`Error: ${err.message}`, 'error', 5000);
-                }
-            }
-            e.target.value = '';
-        };
-        document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+    // Count rows directly from DB for the toast message
+    const cnt = DB.exec(`SELECT COUNT(*) FROM "${tname}"`);
+    const rowCount = cnt.length ? cnt[0].values[0][0] : 0;
+    toast(`✓ Loaded "${tname}" — ${Number(rowCount).toLocaleString()} rows`,'ok');
+    setStatus('busy','Loading…');
+    ed().setValue(`SELECT * FROM "${tname}" LIMIT 100;`);
+    // Note: caller (importFiles) does the final sidebar refresh
+  } catch(e) {
+    toast(`Import failed: ${e.message.slice(0,100)}`,'er');
+    setStatus('ready','Error');
+    console.error(e);
+  }
+}
 
-        // ---------- DRAG & DROP ----------
-        const dropZone = document.getElementById('dropZone');
-        dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-        dropZone.addEventListener('drop', e => { e.preventDefault(); handleFileSelect(e); dropZone.classList.remove('drag-over'); });
+async function importCSV(text, tname, delim=',') {
+  const parsed = Papa.parse(text, {
+    header:true, skipEmptyLines:'greedy', delimiter:delim, dynamicTyping:false
+  });
+  if (!parsed.data.length) throw new Error('No rows found');
+  const cols = parsed.meta.fields.filter(Boolean);
+  if (!cols.length) throw new Error('No columns found');
 
-        // ---------- TABLE SELECTION ----------
-        function selectTable(name) {
-            selectedTable = name;
-            document.querySelectorAll('#tableList > div').forEach(d => d.classList.remove('active-table'));
-            const target = Array.from(document.querySelectorAll('#tableList > div')).find(d => d.textContent.includes(name));
-            if (target) target.classList.add('active-table');
+  // Infer types from a sample (first 300 rows) — fast and accurate enough
+  const sample = parsed.data.slice(0, 300);
+  const types = {};
+  cols.forEach(c => { types[c] = inferColType(sample.map(r=>r[c])); });
 
-            document.getElementById('sqlEditor').value = `SELECT * FROM ${name} LIMIT 100;`;
+  const defs = cols.map(c=>`"${c.replace(/"/g,'""')}" ${types[c]}`).join(',');
+  DB.run(`CREATE TABLE IF NOT EXISTS "${tname}" (${defs})`);
 
-            const qa = document.getElementById('quickActions');
-            qa.style.opacity = '1';
-            qa.classList.remove('pointer-events-none');
-        }
+  const ph = cols.map(()=>'?').join(',');
+  const stmt = DB.prepare(`INSERT INTO "${tname}" VALUES (${ph})`);
+  DB.run('BEGIN TRANSACTION');
+  try {
+    for (const row of parsed.data) {
+      stmt.run(cols.map(c=>castVal(row[c], types[c])));
+    }
+    DB.run('COMMIT');
+  } catch(e) {
+    DB.run('ROLLBACK');
+    throw e;
+  } finally {
+    stmt.free();
+  }
+}
 
-        // QUICK ACTIONS -------------------------------------------------
-        window.previewTable = function() {
-            if (!selectedTable) { showToast('Select a table first', 'warning', 2000); return; }
-            document.getElementById('sqlEditor').value = `SELECT * FROM ${selectedTable} LIMIT 10;`;
-            executeQuery();
-        };
-        window.countTable = function() {
-            if (!selectedTable) { showToast('Select a table first', 'warning', 2000); return; }
-            document.getElementById('sqlEditor').value = `SELECT COUNT(*) AS total_rows FROM ${selectedTable};`;
-            executeQuery();
-        };
-        window.statsTable = function() {
-            if (!selectedTable) { showToast('Select a table first', 'warning', 2000); return; }
-            document.getElementById('sqlEditor').value = `SUMMARIZE ${selectedTable};`;
-            executeQuery();
-        };
+async function importJSON(text, tname) {
+  let data = JSON.parse(text);
+  if (!Array.isArray(data)) {
+    const key = Object.keys(data).find(k=>Array.isArray(data[k]));
+    if (key) data = data[key];
+    else throw new Error('JSON must be an array or have an array property');
+  }
+  if (!data.length) throw new Error('Empty JSON array');
 
-        // ---------- AUTOCOMPLETE ----------
-        const editor = document.getElementById('sqlEditor');
-        const suggestionsBox = document.getElementById('inlineSuggestions');
-        let selIdx = -1, curMatches = [], curWord = '', wStart = 0, wEnd = 0;
+  const cols = [...new Set(data.flatMap(Object.keys))];
+  const types = {};
+  cols.forEach(c => { types[c] = inferColType(data.map(r=>r[c]??null)); });
 
-        function getCursorWord() {
-            const pos = editor.selectionStart;
-            const txt = editor.value;
-            let s = pos, e = pos;
-            while (s > 0 && /[a-zA-Z0-9_.']/.test(txt[s-1])) s--;
-            while (e < txt.length && /[a-zA-Z0-9_.']/.test(txt[e])) e++;
-            return { word: txt.substring(s, e), start: s, end: e, pos };
-        }
+  const defs = cols.map(c=>`"${c.replace(/"/g,'""')}" ${types[c]}`).join(',');
+  DB.run(`CREATE TABLE IF NOT EXISTS "${tname}" (${defs})`);
 
-        function updateSuggestions() {
-            const { word, start, end } = getCursorWord();
-            curWord = word; wStart = start; wEnd = end;
-            if (word.length < 1) { hideSuggestions(); return; }
+  const ph = cols.map(()=>'?').join(',');
+  const stmt = DB.prepare(`INSERT INTO "${tname}" VALUES (${ph})`);
+  DB.run('BEGIN TRANSACTION');
+  try {
+    for (const row of data) {
+      stmt.run(cols.map(c=>castVal(row[c]??null, types[c])));
+    }
+    DB.run('COMMIT');
+  } catch(e) {
+    DB.run('ROLLBACK');
+    throw e;
+  } finally {
+    stmt.free();
+  }
+}
 
-            const upper = word.toUpperCase();
-            const matches = [];
+// ══════════════════════════════════════════════════════════
+// SIDEBAR  — stable rebuild, noTbl never destroyed
+// ══════════════════════════════════════════════════════════
+function refreshSidebar(filter='') {
+  if (!DB) return;
+  // Read tables directly from DB every time
+  const r = DB.exec("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name");
+  const names = r.length ? r[0].values.map(v=>v[0]) : [];
+  tables = {};
+  for (const nm of names) {
+    try {
+      const cnt  = DB.exec(`SELECT COUNT(*) FROM "${nm}"`);
+      const info = DB.exec(`PRAGMA table_info("${nm}")`);
+      tables[nm] = {
+        rowCount: cnt[0].values[0][0],
+        columns:  info[0] ? info[0].values.map(row=>({name:row[1], type:row[2]||'TEXT'})) : []
+      };
+    } catch(e) { tables[nm] = { rowCount:'?', columns:[] }; }
+  }
+  renderTList(filter || document.getElementById('tsrch').value || '');
+}
 
-            completions.keywords.forEach(k => { if (k.name.startsWith(upper)) matches.push({ ...k, display:k.name, category:'Keywords' }); });
-            completions.functions.forEach(f => { if (f.name.toUpperCase().startsWith(upper)) matches.push({ ...f, display:f.name, category:'Functions' }); });
-            tables.forEach(t => { if (t.toLowerCase().startsWith(word.toLowerCase())) matches.push({ name:t, type:'table', desc:'Table', display:t, category:'Tables' }); });
-            Object.entries(columns).forEach(([tbl, cols]) => cols.forEach(col => {
-                if (col.toLowerCase().startsWith(word.toLowerCase())) matches.push({ name:col, type:'column', desc:`${tbl}.${col}`, display:col, category:'Columns' });
-            }));
-            completions.files.forEach(f => { if (f.name.toUpperCase().includes(upper)) matches.push({ ...f, display:f.name, category:'Files' }); });
+function renderTList(filter='') {
+  const list = document.getElementById('tlist');
+  const f    = filter.toLowerCase();
+  const names = Object.keys(tables).filter(n => n.toLowerCase().includes(f));
 
-            curMatches = matches.slice(0,10);
-            curMatches.length ? showSuggestions(curMatches) : hideSuggestions();
-        }
+  // ── Key fix: remove only .ti elements, never touch #noTbl ──
+  list.querySelectorAll('.ti').forEach(el => el.remove());
 
-        function showSuggestions(list) {
-            suggestionsBox.innerHTML = '';
-            selIdx = 0;
-            const groups = {};
-            list.forEach(it => (groups[it.category] = groups[it.category] || []).push(it));
+  const noMsg = document.getElementById('noTbl');
+  if (!names.length) {
+    noMsg.style.display = 'flex';
+    return;
+  }
+  noMsg.style.display = 'none';
 
-            Object.entries(groups).forEach(([cat, items]) => {
-                const hdr = document.createElement('div');
-                hdr.className = 'suggestion-header font-serif';
-                hdr.textContent = cat;
-                suggestionsBox.appendChild(hdr);
-                items.forEach((it,i) => {
-                    const div = document.createElement('div');
-                    div.className = 'suggestion-item';
-                    if (i===0 && Object.keys(groups).indexOf(cat)===0) div.classList.add('selected');
+  names.forEach(nm => {
+    const t   = tables[nm];
+    const div = document.createElement('div');
+    div.className = 'ti';
+    div.innerHTML = `
+      <div class="th2">
+        <span style="font-size:13px">📋</span>
+        <span class="tn" title="${esc(nm)}">${esc(nm)}</span>
+        <span class="trc">${Number(t.rowCount).toLocaleString()}</span>
+      </div>
+      <div class="tact">
+        <button class="tbtn" data-a="preview">Preview</button>
+        <button class="tbtn" data-a="schema">Schema</button>
+        <button class="tbtn" data-a="count">Count</button>
+        <button class="tbtn d" data-a="drop">Drop</button>
+      </div>`;
 
-                    let ic = 'fa-key';
-                    if (it.type==='table') ic='fa-table';
-                    else if (it.type==='column') ic='fa-columns';
-                    else if (it.type==='function') ic='fa-function';
-                    else if (it.type==='file') ic='fa-file';
+    div.querySelector('.th2').addEventListener('click', ()=>{
+      div.classList.toggle('sel');
+      const ex = div.querySelector('.scols');
+      if (ex) { ex.remove(); return; }
+      const sc = document.createElement('div');
+      sc.className = 'scols';
+      t.columns.forEach(col=>{
+        const el = document.createElement('div');
+        el.className = 'scol';
+        el.innerHTML = `<span class="sname">${esc(col.name)}</span><span class="stype">${esc(col.type)}</span>`;
+        el.addEventListener('click', e=>{ e.stopPropagation(); insertText(col.name); });
+        sc.appendChild(el);
+      });
+      div.appendChild(sc);
+    });
 
-                    div.innerHTML = `
-                        <div class="suggestion-icon"><i class="fas ${ic}"></i></div>
-                        <div class="flex-1">
-                            <div class="suggestion-title font-mono">${highlight(it.display,curWord)}</div>
-                            <div class="suggestion-desc">${it.desc}</div>
-                        </div>
-                        ${i===0 && Object.keys(groups).indexOf(cat)===0 ? '<span class="suggestion-shortcut font-mono">Tab</span>' : ''}`;
-                    div.onclick = () => accept(it);
-                    suggestionsBox.appendChild(div);
-                });
-            });
+    div.querySelectorAll('.tbtn').forEach(btn=>{
+      btn.addEventListener('click', e=>{ e.stopPropagation(); tAction(btn.dataset.a, nm); });
+    });
+    list.appendChild(div);
+  });
+}
 
-            suggestionsBox.style.display = 'block';
-            const lineCount = editor.value.substring(0, wStart).split('\n').length;
-            suggestionsBox.style.top = `${lineCount * 20 + 60}px`;
-            suggestionsBox.style.left = '20px';
-        }
+function tAction(action, nm) {
+  const e = ed();
+  if (action==='preview')    { e.setValue(`SELECT * FROM "${nm}" LIMIT 100;`); runQ(); }
+  else if (action==='schema'){ e.setValue(`PRAGMA table_info("${nm}");`); runQ(); }
+  else if (action==='count') { e.setValue(`SELECT COUNT(*) as total_rows FROM "${nm}";`); runQ(); }
+  else if (action==='drop')  {
+    if (!confirm(`Drop table "${nm}"? Cannot be undone.`)) return;
+    try { DB.run(`DROP TABLE IF EXISTS "${nm}"`); toast(`Dropped "${nm}"`,'ok'); refreshSidebar(); }
+    catch(e){ toast(e.message,'er'); }
+  }
+}
 
-        function highlight(txt,q) {
-            const idx = txt.toLowerCase().indexOf(q.toLowerCase());
-            if (idx===-1) return txt;
-            return txt.slice(0,idx)+`<span style="color: var(--oat-accent); font-weight:600;">${txt.slice(idx, idx+q.length)}</span>`+txt.slice(idx+q.length);
-        }
+function insertText(t) {
+  const cm = ed();
+  const cur = cm.getCursor();
+  cm.replaceRange(t, cur);
+  cm.focus();
+}
 
-        function hideSuggestions() { suggestionsBox.style.display='none'; selIdx=-1; curMatches=[]; }
+document.getElementById('tsrch').addEventListener('input', e=>renderTList(e.target.value || ''));
 
-        function accept(item) {
-            const before = editor.value.substring(0,wStart);
-            const after  = editor.value.substring(wEnd);
-            editor.value = before + item.display + after;
-            hideSuggestions();
-            editor.focus();
-            const newPos = wStart + item.display.length;
-            editor.setSelectionRange(newPos,newPos);
-        }
+// ══════════════════════════════════════════════════════════
+// EDITOR
+// ══════════════════════════════════════════════════════════
+function mkEditor(container) {
+  const cm = CodeMirror(container, {
+    mode:'text/x-sql', theme:'default', lineNumbers:true,
+    matchBrackets:true, autoCloseBrackets:true, autofocus:true,
+    indentUnit:2, tabSize:2, smartIndent:true, lineWrapping:false,
+    extraKeys:{
+      'Ctrl-Enter': runQ, 'Cmd-Enter': runQ,
+      'Ctrl-Space': 'autocomplete',
+      'Tab': cm => cm.somethingSelected() ? cm.indentSelection('add') : cm.replaceSelection('  ')
+    },
+    hintOptions:{ completeSingle:false }
+  });
+  cm.on('inputRead', (cm,ch)=>{
+    if (!cm.state.completionActive && /\w/.test(ch.text[0]))
+      CodeMirror.commands.autocomplete(cm,null,{completeSingle:false});
+  });
+  return cm;
+}
 
-        editor.addEventListener('keydown', e => {
-            if (e.key==='Tab' && suggestionsBox.style.display==='block') {
-                e.preventDefault();
-                accept(curMatches[selIdx]||curMatches[0]);
-                return;
-            }
-            if (e.ctrlKey && e.key==='Enter') { executeQuery(); return; }
+const edbox = document.getElementById('edbox');
+editors[0] = mkEditor(edbox);
+editors[0].setValue('-- Welcome to SQL Studio!\n-- Drop a CSV, CSV.GZ, TSV, or JSON file to import it.\n-- Then query it below.\n\n-- Example after import:\n-- SELECT * FROM your_table LIMIT 100;\n-- SELECT exchange, COUNT(*) FROM your_table GROUP BY exchange;');
 
-            if (suggestionsBox.style.display==='block') {
-                const items = suggestionsBox.querySelectorAll('.suggestion-item');
-                if (e.key==='ArrowDown') { e.preventDefault(); selIdx=(selIdx+1)%curMatches.length; updateSel(items); }
-                else if (e.key==='ArrowUp') { e.preventDefault(); selIdx = selIdx<=0 ? curMatches.length-1 : selIdx-1; updateSel(items); }
-                else if (e.key==='Enter' && selIdx>=0) { e.preventDefault(); accept(curMatches[selIdx]); }
-                else if (e.key==='Escape') hideSuggestions();
-            }
-        });
+function ed() { return editors[actTab]; }
 
-        function updateSel(items) {
-            items.forEach((el,i)=>{ el.classList.toggle('selected',i===selIdx); const sc=el.querySelector('.suggestion-shortcut'); if(sc) sc.textContent = i===selIdx?'Tab':''; });
-        }
+// ══════════════════════════════════════════════════════════
+// QUERY TABS
+// ══════════════════════════════════════════════════════════
+document.getElementById('addtab').addEventListener('click', ()=>{
+  const id = ++tabN;
+  const el = document.createElement('div');
+  el.className='qtab'; el.dataset.tab=id;
+  el.innerHTML=`<span>Query ${id}</span><span class="qx">×</span>`;
+  document.getElementById('addtab').before(el);
+  const tmp = document.createElement('div');
+  tmp.style.height='100%';
+  editors[id] = mkEditor(tmp);
+  switchTab(id);
+});
 
-        editor.addEventListener('input', updateSuggestions);
-        editor.addEventListener('blur', () => setTimeout(hideSuggestions,200));
+document.getElementById('qtabs').addEventListener('click', e=>{
+  const tab = e.target.closest('.qtab');
+  if (!tab) return;
+  if (e.target.classList.contains('qx')){ closeTab(+tab.dataset.tab); return; }
+  switchTab(+tab.dataset.tab);
+});
 
-        // ---------- QUERY EXECUTION ----------
-        window.executeQuery = async function() {
-            if (!conn) return;
-            const sql = editor.value.trim();
-            if (!sql) { showToast('Enter a query', 'warning', 2000); return; }
+function switchTab(id){
+  document.querySelectorAll('.qtab').forEach(t=>t.classList.toggle('on',+t.dataset.tab===id));
+  const box=document.getElementById('edbox');
+  box.innerHTML='';
+  if (editors[id]){ box.appendChild(editors[id].getWrapperElement()); setTimeout(()=>editors[id].refresh(),30); }
+  actTab=id;
+}
+function closeTab(id){
+  if (Object.keys(editors).length<=1) return;
+  document.querySelector(`.qtab[data-tab="${id}"]`)?.remove();
+  delete editors[id];
+  if (actTab===id){ const ids=Object.keys(editors); switchTab(+ids[ids.length-1]); }
+}
 
-            toggleLoading(true);
-            document.getElementById('errorState').classList.add('hidden');
+// ══════════════════════════════════════════════════════════
+// RUN QUERY
+// ══════════════════════════════════════════════════════════
+document.getElementById('runbtn').addEventListener('click', runQ);
+document.getElementById('fmtbtn').addEventListener('click', ()=>{ const e=ed(); e.setValue(fmtSQL(e.getValue())); });
+document.getElementById('clrbtn').addEventListener('click', ()=> ed().setValue(''));
 
-            try {
-                const t0 = performance.now();
-                const result = await conn.query(sql);
-                const ms = (performance.now() - t0).toFixed(0);
-                renderResult(result, ms);
-                currentResults = result;
-                if (/CREATE|DROP|INSERT/i.test(sql)) refreshTables();
-            } catch (err) {
-                document.getElementById('errorText').textContent = err.message;
-                document.getElementById('errorState').classList.remove('hidden');
-                document.getElementById('resultsTable').classList.add('hidden');
-                document.getElementById('emptyState').classList.add('hidden');
-            }
-            toggleLoading(false);
-        };
+function runQ() {
+  if (!DB) return;
+  const e   = ed();
+  const sql = e.getSelection() || e.getValue();
+  if (!sql.trim()) return;
 
-        function renderResult(res, ms) {
-            const table = document.getElementById('resultsTable');
-            const thead = table.querySelector('thead');
-            const tbody = table.querySelector('tbody');
-            document.getElementById('emptyState').classList.add('hidden');
-            table.classList.remove('hidden');
-            thead.innerHTML=''; tbody.innerHTML='';
+  const limit = document.getElementById('lsel').value;
+  const stmts = splitSQL(sql);
 
-            const schema = res.schema;
-            const rows = res.toArray();
+  showLoad(true);
+  setStatus('busy','Running…');
+  clearRes();
 
-            const tr = document.createElement('tr');
-            schema.fields.forEach(f => {
-                const th = document.createElement('th');
-                th.className='px-3 py-2 text-left font-serif';
-                th.innerHTML = `${f.name}<div class="text-[9px] opacity-60 font-normal mt-0.5 font-sans">${f.type}</div>`;
-                tr.appendChild(th);
-            });
-            thead.appendChild(tr);
+  const t0=Date.now();
+  let lastRes=null, errMsg=null;
 
-            rows.slice(0,1000).forEach((row,i)=>{
-                const tr = document.createElement('tr');
-                tr.style.background = i%2 ? 'var(--oat-warm)' : 'var(--oat-cream)';
-                schema.fields.forEach(f => {
-                    const td = document.createElement('td');
-                    td.className='px-3 py-2 font-mono';
-                    const v = row[f.name];
-                    td.textContent = v===null ? 'NULL' : String(v);
-                    if (v===null) td.style.color='var(--oat-stone)';
-                    tr.appendChild(td);
-                });
-                tbody.appendChild(tr);
-            });
+  try {
+    for (let i=0;i<stmts.length;i++) {
+      let s=stmts[i].trim();
+      if (!s) continue;
+      if (i===stmts.length-1 && limit && /^SELECT\b/i.test(s) && !/\bLIMIT\b/i.test(s))
+        s+=` LIMIT ${limit}`;
+      const r=DB.exec(s);
+      if (r.length) lastRes=r[0];
+    }
+    const ms=Date.now()-t0;
+    if (lastRes) {
+      const {columns,values}=lastRes;
+      const rows=values.map(r=>{ const o={}; columns.forEach((c,i)=>o[c]=r[i]); return o; });
+      res={cols:columns, rows, filtered:rows};
+      pg=0; sCol=-1;
+      renderTbl(res.filtered, columns);
+      setMeta(`<span class="ok">✓</span> ${rows.length.toLocaleString()} row${rows.length!==1?'s':''} · ${ms}ms`);
+      addHist(sql,rows.length,ms,'ok');
+    } else {
+      const ms2=Date.now()-t0;
+      setMeta(`<span class="ok">✓</span> Query OK · ${ms2}ms`);
+      addHist(sql,0,ms2,'ok');
+      showLoad(false);
+      const ph=document.getElementById('ph');
+      ph.style.display='flex';
+      ph.innerHTML='<div class="phico">✅</div><div style="font-size:13px">Executed successfully</div>';
+      refreshSidebar();
+    }
+    setStatus('ready','Done');
+  } catch(e) {
+    showLoad(false);
+    const ms2=Date.now()-t0;
+    setMeta(`<span class="er">✗</span> ${esc(e.message.slice(0,120))}`);
+    addHist(sql,0,ms2,'err');
+    setStatus('ready','Error');
+    toast(e.message.slice(0,100),'er');
+  }
+}
 
-            document.getElementById('resultStats').textContent = `${rows.length} rows • ${ms}ms`;
-            document.getElementById('resultStats').classList.remove('hidden');
-        }
+function splitSQL(sql) {
+  // Split on semicolons not inside strings/comments
+  const out=[]; let cur='', inStr=false, strCh='';
+  for (let i=0;i<sql.length;i++){
+    const c=sql[i];
+    if (inStr){ cur+=c; if(c===strCh && sql[i-1]!=='\\') inStr=false; }
+    else if (c==="'" || c==='"'){ inStr=true; strCh=c; cur+=c; }
+    else if (c===';'){ const t=cur.trim(); if(t) out.push(t); cur=''; }
+    else cur+=c;
+  }
+  const t=cur.trim(); if(t) out.push(t);
+  return out.length?out:[sql];
+}
 
-        // ---------- TABLE LIST ----------
-        window.refreshTables = async function() {
-            if (!conn) return;
-            const res = await conn.query(`SELECT table_name FROM information_schema.tables WHERE table_schema='main' ORDER BY table_name`);
-            tables = res.toArray().map(r=>r.table_name);
-            const list = document.getElementById('tableList');
-            if (!tables.length) {
-                list.innerHTML = '<div class="text-xs text-center py-8 italic font-serif" style="color: var(--oat-stone);">No tables</div>';
-                return;
-            }
-            list.innerHTML = '';
-            tables.forEach(t=>{
-                const div=document.createElement('div');
-                div.className='flex items-center gap-2 px-2 py-1.5 text-xs rounded cursor-pointer group transition-colors';
-                div.style.color='var(--oat-charcoal)';
-                div.innerHTML=`<i class="fas fa-table" style="color: var(--oat-stone);"></i><span class="font-mono">${t}</span>`;
-                div.onclick=()=>selectTable(t);
-                list.appendChild(div);
-            });
-        };
-        window.filterTables = function(v){
-            const lo=v.toLowerCase();
-            document.querySelectorAll('#tableList > div').forEach(d=>{ d.style.display = d.textContent.toLowerCase().includes(lo) ? '' : 'none'; });
-        };
+// ══════════════════════════════════════════════════════════
+// RENDER TABLE
+// ══════════════════════════════════════════════════════════
+function renderTbl(rows, cols, p=0) {
+  showLoad(false);
+  document.getElementById('ph').style.display='none';
 
-        // ---------- UI UTILITIES ----------
-        function toggleLoading(on){ document.getElementById('loadingState').classList.toggle('hidden',!on); }
-        window.openHelp = ()=> document.getElementById('helpModal').classList.add('show');
-        window.closeHelp = ()=> document.getElementById('helpModal').classList.remove('show');
+  const totalPgs = Math.ceil(rows.length/PAGE);
+  const pageRows = rows.slice(p*PAGE,(p+1)*PAGE);
 
-        window.formatSQL = function() {
-            let sql = editor.value;
-            ['select','from','where','group by','order by','join','left','inner','on','and','or','with','create','table','insert','values','update','delete','drop']
-                .forEach(k=>{ sql = sql.replace(new RegExp(`\\b${k}\\b`,'gi'), k.toUpperCase()); });
-            editor.value = sql.replace(/\b(SELECT|FROM|WHERE|GROUP BY|ORDER BY|JOIN|WITH)\b/g,'\n$1').trim();
-        };
-        window.clearEditor = function(){ editor.value=''; hideSuggestions(); };
+  // Determine display type for each column from first 50 rows
+  const dispTypes = cols.map(c=>{
+    const samp=rows.slice(0,50).map(r=>r[c]).filter(v=>v!==null&&v!==undefined);
+    if (!samp.length) return 'NULL';
+    if (samp.every(v=>typeof v==='number'||typeof v==='bigint')){
+      return samp.every(v=>Number.isInteger(Number(v)))?'INTEGER':'REAL';
+    }
+    if (samp.every(v=>/^\d{4}-\d{2}-\d{2}/.test(String(v)))) return 'DATE';
+    return 'TEXT';
+  });
 
-        window.copyResults = function() {
-            if (!currentResults) return;
-            const rows = currentResults.toArray();
-            const schema = currentResults.schema;
-            let txt = schema.fields.map(f=>f.name).join('\t') + '\n';
-            rows.forEach(r=> txt += schema.fields.map(f=> r[f.name]===null ? '' : String(r[f.name])).join('\t') + '\n');
-            navigator.clipboard.writeText(txt);
-            showToast('Copied to clipboard', 'success', 2000);
-        };
-        window.exportCSV = function() {
-            if (!currentResults) { showToast('No results', 'warning', 2000); return; }
-            const rows = currentResults.toArray();
-            const schema = currentResults.schema;
-            let csv = schema.fields.map(f=>f.name).join(',') + '\n';
-            rows.forEach(r=>{
-                csv += schema.fields.map(f=>{
-                    const v=r[f.name];
-                    if (v===null) return '';
-                    const s=String(v);
-                    return s.includes(',')||s.includes('"') ? `"${s.replace(/"/g,'""')}"` : s;
-                }).join(',') + '\n';
-            });
-            const blob = new Blob([csv],{type:'text/csv'});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `results_${Date.now()}.csv`;
-            a.click();
-            URL.revokeObjectURL(url);
-            showToast('CSV exported', 'success', 2000);
-        };
-    </script>
+  let html='<table class="rt"><thead><tr><th>#</th>';
+  cols.forEach((c,i)=>{
+    const cls=sCol===i?(sDir===1?'sasc':'sdsc'):'';
+    html+=`<th class="${cls}" data-ci="${i}" data-cn="${esc(c)}">${esc(c)}<span class="ctype">${dispTypes[i]}</span><span class="sarr">↑</span></th>`;
+  });
+  html+='</tr></thead><tbody>';
+
+  pageRows.forEach((row,ri)=>{
+    html+=`<tr><td>${p*PAGE+ri+1}</td>`;
+    cols.forEach((c,i)=>{
+      const v=row[c];
+      if (v===null||v===undefined) html+=`<td class="vnull">NULL</td>`;
+      else if (typeof v==='number'||typeof v==='bigint') html+=`<td class="vnum">${esc(String(v))}</td>`;
+      else html+=`<td>${esc(String(v))}</td>`;
+    });
+    html+='</tr>';
+  });
+  html+='</tbody></table>';
+
+  const dt=document.getElementById('dtable');
+  dt.innerHTML=html; dt.className='on';
+
+  dt.querySelectorAll('th[data-ci]').forEach(th=>{
+    th.addEventListener('click',()=>{
+      const ci=+th.dataset.ci, cn=th.dataset.cn;
+      if (sCol===ci) sDir*=-1; else { sCol=ci; sDir=1; }
+      const sorted=[...res.filtered].sort((a,b)=>{
+        const av=a[cn],bv=b[cn];
+        if (av===null) return 1; if (bv===null) return -1;
+        return (av<bv?-1:av>bv?1:0)*sDir;
+      });
+      res.filtered=sorted; pg=0; renderTbl(sorted,cols,0);
+    });
+  });
+
+  // Pager
+  const pager=document.getElementById('pager');
+  if (totalPgs>1){
+    pager.style.display='flex';
+    document.getElementById('pinfo').textContent=`Page ${p+1} / ${totalPgs}`;
+    document.getElementById('pcount').textContent=`${rows.length.toLocaleString()} rows`;
+    const pp=document.getElementById('pprev'), pn=document.getElementById('pnext');
+    pp.disabled=p===0; pn.disabled=p>=totalPgs-1;
+    pp.onclick=()=>{ pg--; renderTbl(res.filtered,cols,pg); };
+    pn.onclick=()=>{ pg++; renderTbl(res.filtered,cols,pg); };
+  } else { pager.style.display='none'; }
+
+  document.getElementById('vtog').style.display='flex';
+  document.getElementById('csvbtn').style.display='';
+  document.getElementById('cpybtn').style.display='';
+  document.getElementById('rfilter').style.display='';
+}
+
+// ══════════════════════════════════════════════════════════
+// ROW FILTER  — supports text search AND numeric operators
+//   Examples: "MCX"  ">=100"  ">0"  "<=50"  "=NRML"  "!=0"
+// ══════════════════════════════════════════════════════════
+document.getElementById('rfilter').addEventListener('input', e=>{
+  if (!res) return;
+  const q = e.target.value.trim();
+  if (!q) {
+    res.filtered = res.rows;
+  } else {
+    const op = q.match(/^(>=|<=|!=|>|<|=)(.+)$/);
+    if (op) {
+      const operator = op[1];
+      const raw = op[2].trim();
+      const num = parseFloat(raw.replace(/,/g,''));
+      if (!isNaN(num)) {
+        // Numeric operator filter — checks ALL columns
+        res.filtered = res.rows.filter(row =>
+          Object.values(row).some(v => {
+            if (v===null) return false;
+            const n = typeof v==='number' ? v : parseFloat(String(v).replace(/,/g,''));
+            if (isNaN(n)) return false;
+            if (operator==='>=') return n>=num;
+            if (operator==='<=') return n<=num;
+            if (operator==='>')  return n>num;
+            if (operator==='<')  return n<num;
+            if (operator==='=')  return n===num;
+            if (operator==='!=') return n!==num;
+          })
+        );
+      } else {
+        // String equality / inequality
+        const sv = raw.toLowerCase();
+        res.filtered = res.rows.filter(row =>
+          Object.values(row).some(v => {
+            if (v===null) return false;
+            const s = String(v).toLowerCase();
+            if (operator==='=')  return s===sv;
+            if (operator==='!=') return s!==sv;
+            return s.includes(sv);
+          })
+        );
+      }
+    } else {
+      // Substring search
+      const ql = q.toLowerCase();
+      res.filtered = res.rows.filter(row =>
+        Object.values(row).some(v => v!==null && String(v).toLowerCase().includes(ql))
+      );
+    }
+  }
+  pg=0; sCol=-1;
+  renderTbl(res.filtered, res.cols, 0);
+  // Update meta to show filtered count
+  const total=res.rows.length, shown=res.filtered.length;
+  if (shown!==total)
+    setMeta(`<span class="ok">✓</span> ${shown.toLocaleString()} / ${total.toLocaleString()} rows (filtered)`);
+});
+
+// ══════════════════════════════════════════════════════════
+// VIEW TOGGLE
+// ══════════════════════════════════════════════════════════
+document.getElementById('vtog').addEventListener('click', e=>{
+  const btn=e.target.closest('.vbtn');
+  if (!btn||!res) return;
+  document.querySelectorAll('.vbtn').forEach(b=>b.classList.toggle('on',b===btn));
+  if (btn.dataset.v==='json'){
+    document.getElementById('dtable').className='';
+    document.getElementById('jview').className='on';
+    document.getElementById('jpre').textContent=JSON.stringify(res.filtered.slice(0,500),null,2);
+  } else {
+    document.getElementById('jview').className='';
+    renderTbl(res.filtered,res.cols,pg);
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// EXPORT
+// ══════════════════════════════════════════════════════════
+document.getElementById('csvbtn').addEventListener('click',()=>{
+  if (!res) return;
+  const {cols,filtered}=res;
+  const hdr=cols.map(c=>JSON.stringify(c)).join(',');
+  const body=filtered.map(row=>cols.map(c=>{
+    const v=row[c]; if (v===null) return '';
+    const s=String(v);
+    return (s.includes(',')||s.includes('"')||s.includes('\n'))?JSON.stringify(s):s;
+  }).join(',')).join('\n');
+  dlFile(hdr+'\n'+body,'results.csv','text/csv');
+});
+
+document.getElementById('cpybtn').addEventListener('click',()=>{
+  if (!res) return;
+  const {cols,filtered}=res;
+  const tsv=[cols.join('\t'),...filtered.map(r=>cols.map(c=>r[c]??'').join('\t'))].join('\n');
+  navigator.clipboard.writeText(tsv).then(()=>toast('Copied as TSV ✓','ok'));
+});
+
+function dlFile(content,name,type){
+  const a=Object.assign(document.createElement('a'),{
+    href:URL.createObjectURL(new Blob([content],{type})),download:name
+  });
+  a.click();
+}
+
+// ══════════════════════════════════════════════════════════
+// HISTORY
+// ══════════════════════════════════════════════════════════
+function addHist(sql,rows,ms,status){
+  hist.unshift({sql,rows,ms,status,t:new Date()});
+  if (hist.length>100) hist.pop();
+  renderHist();
+}
+function renderHist(){
+  const list=document.getElementById('hlist');
+  if (!hist.length) return;
+  list.innerHTML='';
+  hist.slice(0,50).forEach(h=>{
+    const el=document.createElement('div');
+    el.className='hi';
+    el.innerHTML=`<div class="hsql">${esc(h.sql.replace(/\s+/g,' ').trim())}</div>
+      <div class="hmeta">
+        <span class="${h.status==='ok'?'ok':'er'}">${h.status==='ok'?'✓':'✗'} ${Number(h.rows).toLocaleString()} rows</span>
+        <span>${h.ms}ms</span><span>${h.t.toLocaleTimeString()}</span>
+      </div>`;
+    el.addEventListener('click',()=>{ ed().setValue(h.sql); switchPanel('tp'); });
+    list.appendChild(el);
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// SIDEBAR PANEL SWITCH
+// ══════════════════════════════════════════════════════════
+document.querySelectorAll('.stab').forEach(t=>t.addEventListener('click',()=>switchPanel(t.dataset.p)));
+function switchPanel(id){
+  document.querySelectorAll('.stab').forEach(t=>t.classList.toggle('on',t.dataset.p===id));
+  document.querySelectorAll('.spanel').forEach(p=>p.classList.toggle('on',p.id===id));
+}
+
+// ══════════════════════════════════════════════════════════
+// SNIPPETS
+// ══════════════════════════════════════════════════════════
+document.querySelectorAll('.snip').forEach(el=>{
+  el.addEventListener('click',()=>{ ed().setValue(el.dataset.sql.replace(/\\n/g,'\n')); switchPanel('tp'); });
+});
+
+// ══════════════════════════════════════════════════════════
+// RESIZE HANDLES
+// ══════════════════════════════════════════════════════════
+let sr=false;
+document.getElementById('sresz').addEventListener('mousedown',e=>{sr=true;e.preventDefault();});
+document.addEventListener('mousemove',e=>{
+  if(!sr)return;
+  document.getElementById('sidebar').style.width=Math.max(180,Math.min(480,e.clientX))+'px';
+});
+document.addEventListener('mouseup',()=>sr=false);
+
+let er=false,ey=0,eh=0;
+document.getElementById('rhandle').addEventListener('mousedown',e=>{er=true;ey=e.clientY;eh=document.getElementById('edbox').offsetHeight;e.preventDefault();});
+document.addEventListener('mousemove',e=>{
+  if(!er)return;
+  const h=Math.max(60,Math.min(600,eh+e.clientY-ey));
+  document.getElementById('edbox').style.height=h+'px';
+  ed().refresh();
+});
+document.addEventListener('mouseup',()=>er=false);
+
+// ══════════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════════
+function clearRes(){
+  res=null;
+  document.getElementById('dtable').className='';
+  document.getElementById('dtable').innerHTML='';
+  document.getElementById('jview').className='';
+  document.getElementById('ph').style.display='none';
+  document.getElementById('pager').style.display='none';
+  document.getElementById('vtog').style.display='none';
+  document.getElementById('csvbtn').style.display='none';
+  document.getElementById('cpybtn').style.display='none';
+  document.getElementById('rfilter').style.display='none';
+  document.getElementById('rfilter').value='';
+  document.querySelectorAll('.vbtn').forEach((b,i)=>b.classList.toggle('on',i===0));
+}
+function showLoad(v){ document.getElementById('loading').className=v?'on':''; }
+function setMeta(h){ document.getElementById('rmeta').innerHTML=h; }
+
+function fmtSQL(sql){
+  ['SELECT','FROM','WHERE','GROUP BY','ORDER BY','HAVING','LIMIT','OFFSET',
+   'JOIN','LEFT JOIN','RIGHT JOIN','INNER JOIN','CROSS JOIN','ON','AND','OR','NOT',
+   'AS','WITH','UNION','INSERT INTO','VALUES','UPDATE','SET','DELETE FROM',
+   'CREATE TABLE','DROP TABLE','ALTER TABLE','PRAGMA'].forEach(k=>{
+    sql=sql.replace(new RegExp(`\\b${k}\\b`,'gi'),k);
+  });
+  return sql;
+}
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+let tTmr;
+function toast(msg,type=''){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className=`on ${type}`;
+  clearTimeout(tTmr); tTmr=setTimeout(()=>el.className='',3500);
+}
+
+// ══════════════════════════════════════════════════════════
+// BOOT
+// ══════════════════════════════════════════════════════════
+init();
+</script>
 </body>
 </html>
